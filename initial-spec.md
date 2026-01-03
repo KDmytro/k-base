@@ -1,4 +1,4 @@
-# BranchMind: Branching Brainstorming & Learning App
+# K-Base: Branching Brainstorming & Learning App
 
 ## Technical Specification Document v1.0
 
@@ -23,7 +23,7 @@
 
 ## 1. Executive Summary
 
-BranchMind is a brainstorming and learning application that treats conversations as trees rather than linear logs. Users can branch conversations at any point, collapse tangents, and maintain shared memory across related sessions.
+K-Base is a brainstorming and learning application that treats conversations as trees rather than linear logs. Users can branch conversations at any point, collapse tangents, and maintain shared memory across related sessions.
 
 ### V1 Scope
 
@@ -1548,7 +1548,7 @@ brew install postgresql@15
 brew services start postgresql@15
 
 # Create database
-createdb branchmind
+createdb kbase
 
 # Install pgvector extension
 # Option 1: If using Homebrew postgres
@@ -1562,14 +1562,14 @@ make
 make install
 
 # Enable extension in database
-psql branchmind -c "CREATE EXTENSION vector;"
+psql kbase -c "CREATE EXTENSION vector;"
 ```
 
 ### 11.3 Backend Setup
 
 ```bash
 # Create project directory
-mkdir branchmind && cd branchmind
+mkdir kbase && cd kbase
 mkdir backend frontend
 
 # Backend setup
@@ -1585,7 +1585,7 @@ pip install alembic  # for migrations
 
 # Create .env file
 cat > .env << EOF
-DATABASE_URL=postgresql+asyncpg://localhost/branchmind
+DATABASE_URL=postgresql+asyncpg://localhost/kbase
 OPENAI_API_KEY=sk-your-key-here
 EOF
 
@@ -1620,7 +1620,7 @@ pnpm dev
 ### 11.5 Project Structure
 
 ```
-branchmind/
+kbase/
 ├── backend/
 │   ├── alembic/              # Database migrations
 │   ├── api/
@@ -1711,7 +1711,7 @@ branchmind/
 # .env.example
 
 # Database
-DATABASE_URL=postgresql+asyncpg://user:pass@localhost:5432/branchmind
+DATABASE_URL=postgresql+asyncpg://user:pass@localhost:5432/kbase
 
 # LLM Providers
 OPENAI_API_KEY=sk-...
