@@ -12,7 +12,39 @@ import type {
   ChatResponse,
 } from '@/types/models';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || '/api/v1';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
+
+// Convert snake_case to camelCase
+function snakeToCamel(str: string): string {
+  return str.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
+}
+
+// Convert camelCase to snake_case
+function camelToSnake(str: string): string {
+  return str.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`);
+}
+
+// Recursively transform object keys
+function transformKeys<T>(obj: unknown, transformer: (key: string) => string): T {
+  if (obj === null || obj === undefined) {
+    return obj as T;
+  }
+
+  if (Array.isArray(obj)) {
+    return obj.map((item) => transformKeys(item, transformer)) as T;
+  }
+
+  if (typeof obj === 'object') {
+    const result: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(obj as Record<string, unknown>)) {
+      const newKey = transformer(key);
+      result[newKey] = transformKeys(value, transformer);
+    }
+    return result as T;
+  }
+
+  return obj as T;
+}
 
 class ApiClient {
   private baseUrl: string;
@@ -26,8 +58,21 @@ class ApiClient {
     options: RequestInit = {}
   ): Promise<T> {
     const url = `${this.baseUrl}${endpoint}`;
+
+    // Transform request body keys to snake_case
+    let body = options.body;
+    if (body && typeof body === 'string') {
+      try {
+        const parsed = JSON.parse(body);
+        body = JSON.stringify(transformKeys(parsed, camelToSnake));
+      } catch {
+        // Not JSON, leave as is
+      }
+    }
+
     const response = await fetch(url, {
       ...options,
+      body,
       headers: {
         'Content-Type': 'application/json',
         ...options.headers,
@@ -35,10 +80,19 @@ class ApiClient {
     });
 
     if (!response.ok) {
-      throw new Error(`API Error: ${response.statusText}`);
+      const errorText = await response.text();
+      throw new Error(`API Error: ${response.status} - ${errorText}`);
     }
 
-    return response.json();
+    // Handle empty responses (like DELETE)
+    const contentType = response.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      return undefined as T;
+    }
+
+    const data = await response.json();
+    // Transform response keys to camelCase
+    return transformKeys<T>(data, snakeToCamel);
   }
 
   // Topics
@@ -111,13 +165,6 @@ class ApiClient {
       method: 'POST',
       body: JSON.stringify(request),
     });
-  }
-
-  // TODO: Implement streaming chat with WebSocket or SSE
-  async *streamMessage(request: ChatRequest): AsyncGenerator<string> {
-    // Placeholder for streaming implementation
-    const response = await this.sendMessage(request);
-    yield response.assistantNode.content;
   }
 }
 

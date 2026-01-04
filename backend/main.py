@@ -65,13 +65,18 @@ async def health_check():
     }
 
 
-# TODO: Import and include routers
-# from api.routes import topics, sessions, nodes, chat, memory
-# app.include_router(topics.router, prefix="/api/v1/topics", tags=["topics"])
-# app.include_router(sessions.router, prefix="/api/v1/sessions", tags=["sessions"])
-# app.include_router(nodes.router, prefix="/api/v1/nodes", tags=["nodes"])
-# app.include_router(chat.router, prefix="/api/v1/chat", tags=["chat"])
-# app.include_router(memory.router, prefix="/api/v1/memory", tags=["memory"])
+# Import and include routers
+from api.routes.topics import router as topics_router
+from api.routes.sessions import router as sessions_router, topics_sessions_router
+from api.routes.nodes import router as nodes_router, sessions_nodes_router
+from api.routes.chat import router as chat_router
+
+app.include_router(topics_router, prefix="/api/v1")
+app.include_router(sessions_router, prefix="/api/v1")
+app.include_router(topics_sessions_router, prefix="/api/v1")
+app.include_router(nodes_router, prefix="/api/v1")
+app.include_router(sessions_nodes_router, prefix="/api/v1")
+app.include_router(chat_router, prefix="/api/v1")
 
 
 if __name__ == "__main__":

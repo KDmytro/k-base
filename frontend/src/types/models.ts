@@ -137,7 +137,7 @@ export interface MemorySearchResult {
     contentType: ChunkType;
     sessionId: string;
     nodeId?: string;
-    similarity: float;
+    similarity: number;
     priorityBoost: number;
 }
 

@@ -7,9 +7,9 @@ import enum
 
 from sqlalchemy import (
     Column, String, Text, DateTime, Integer, Boolean, Float,
-    ForeignKey, Enum as SQLEnum, Index, func
+    ForeignKey, Index, func
 )
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from sqlalchemy.dialects.postgresql import UUID, JSONB, ENUM as PGEnum
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import declarative_base, relationship
 from pgvector.sqlalchemy import Vector
@@ -115,10 +115,19 @@ class Node(Base):
 
     # Content
     content = Column(Text, nullable=False)
-    node_type = Column(SQLEnum(NodeType), nullable=False)
+    node_type = Column(
+        PGEnum('user_message', 'assistant_message', 'user_note', 'branch_summary', 'system',
+               name='node_type', create_type=False),
+        nullable=False
+    )
 
     # Branch state
-    status = Column(SQLEnum(NodeStatus), default=NodeStatus.ACTIVE, nullable=False)
+    status = Column(
+        PGEnum('active', 'collapsed', 'abandoned', 'merged',
+               name='node_status', create_type=False),
+        default='active',
+        nullable=False
+    )
     branch_name = Column(String(255), nullable=True)
     collapsed_summary = Column(Text, nullable=True)
 
@@ -162,7 +171,10 @@ class MemoryChunk(Base):
 
     # Content
     content = Column(Text, nullable=False)
-    content_type = Column(SQLEnum(ChunkType), nullable=False)
+    content_type = Column(
+        PGEnum('note', 'summary', 'message', name='chunk_type', create_type=False),
+        nullable=False
+    )
 
     # Vector embedding (1536 dimensions for text-embedding-3-small)
     embedding = Column(Vector(1536), nullable=False)

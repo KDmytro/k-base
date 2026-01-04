@@ -114,7 +114,6 @@ class NodeResponse(BaseModel):
     is_selected_path: bool
     created_at: datetime
     updated_at: datetime
-    children: List["NodeResponse"] = []
 
     class Config:
         from_attributes = True
