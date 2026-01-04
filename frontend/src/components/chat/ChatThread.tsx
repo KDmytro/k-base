@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { StickyNote } from 'lucide-react';
 import { ChatMessage } from './ChatMessage';
 import { ChatInput } from './ChatInput';
-import { BranchSwitcher } from './BranchSwitcher';
+import { CollapsedBranch } from './CollapsedBranch';
 import { NotePanel } from './NotePanel';
 import { SideChatPanel } from './SideChatPanel';
 import type { Node } from '@/types/models';
@@ -16,12 +16,8 @@ interface ChatThreadProps {
   onClearReply?: () => void;
   sessionName?: string;
   // Branch switching props
-  siblingCounts?: Map<string, number>;
-  onShowBranches?: (nodeId: string) => void;
-  branchSwitcherNodeId?: string | null;
-  branchSwitcherSiblings?: Node[];
+  forkPointBranches?: Map<string, Node[]>;  // parentId -> child branches
   onSelectBranch?: (nodeId: string) => void;
-  onCloseBranchSwitcher?: () => void;
   // Streaming props
   streamingContent?: string;
   isStreaming?: boolean;
@@ -54,12 +50,8 @@ export function ChatThread({
   replyToNode,
   onClearReply,
   sessionName,
-  siblingCounts,
-  onShowBranches,
-  branchSwitcherNodeId,
-  branchSwitcherSiblings,
+  forkPointBranches,
   onSelectBranch,
-  onCloseBranchSwitcher,
   streamingContent,
   isStreaming,
   nodeNotes,
@@ -106,21 +98,41 @@ export function ChatThread({
           </div>
         ) : (
           <div className="divide-y">
-            {nodes.map((node) => {
+            {nodes.map((node, index) => {
               const note = nodeNotes?.get(node.id);
+              const forkBranches = forkPointBranches?.get(node.id);
+              const nextNode = nodes[index + 1];
+              const isForkPoint = forkBranches && forkBranches.length > 1;
+
               return (
                 <div key={node.id} className="relative">
                   <ChatMessage
                     node={node}
-                    siblingCount={siblingCounts?.get(node.id) ?? 1}
+                    isForkPoint={isForkPoint}
+                    forkBranchCount={forkBranches?.length ?? 0}
                     onFork={onForkNode}
-                    onShowBranches={onShowBranches}
                     note={note}
                     onNote={onOpenNotePanel}
                     sideChatCount={sideChatCounts?.get(node.id) ?? 0}
                     highlightedTexts={sideChatThreads?.get(node.id)}
                     onSideChat={onOpenSideChat}
                   />
+
+                  {/* Collapsed branches - show non-active siblings at fork point */}
+                  {isForkPoint && onSelectBranch && (
+                    <div className="mx-4 my-2">
+                      {forkBranches
+                        .filter(branch => branch.id !== nextNode?.id)
+                        .map(branch => (
+                          <CollapsedBranch
+                            key={branch.id}
+                            node={branch}
+                            onClick={() => onSelectBranch(branch.id)}
+                          />
+                        ))}
+                    </div>
+                  )}
+
                   {/* Inline note display */}
                   {note && (
                     <div
@@ -132,15 +144,6 @@ export function ChatThread({
                         <p className="text-sm text-yellow-800">{note.content}</p>
                       </div>
                     </div>
-                  )}
-                  {/* Branch switcher dropdown */}
-                  {branchSwitcherNodeId === node.id && branchSwitcherSiblings && onSelectBranch && onCloseBranchSwitcher && (
-                    <BranchSwitcher
-                      siblings={branchSwitcherSiblings}
-                      currentNodeId={node.id}
-                      onSelect={onSelectBranch}
-                      onClose={onCloseBranchSwitcher}
-                    />
                   )}
                 </div>
               );

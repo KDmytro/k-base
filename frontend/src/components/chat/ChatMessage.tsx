@@ -8,9 +8,9 @@ import type { Node } from '@/types/models';
 
 interface ChatMessageProps {
   node: Node;
-  siblingCount?: number;
+  isForkPoint?: boolean;         // This node has multiple children (branches)
+  forkBranchCount?: number;      // Number of child branches
   onFork?: (nodeId: string) => void;
-  onShowBranches?: (nodeId: string) => void;
   note?: Node | null;
   onNote?: (nodeId: string) => void;
   sideChatCount?: number;
@@ -18,10 +18,9 @@ interface ChatMessageProps {
   onSideChat?: (nodeId: string, selectedText?: string) => void;
 }
 
-export function ChatMessage({ node, siblingCount = 1, onFork, onShowBranches, note, onNote, sideChatCount = 0, highlightedTexts, onSideChat }: ChatMessageProps) {
+export function ChatMessage({ node, isForkPoint = false, forkBranchCount = 0, onFork, note, onNote, sideChatCount = 0, highlightedTexts, onSideChat }: ChatMessageProps) {
   const isUser = node.nodeType === 'user_message';
   const isNote = node.nodeType === 'user_note';
-  const hasBranches = siblingCount > 1;
   const hasNote = !!note;
   const hasSideChats = sideChatCount > 0;
 
@@ -318,18 +317,17 @@ export function ChatMessage({ node, siblingCount = 1, onFork, onShowBranches, no
 
       {/* Action buttons container - top right */}
       <div className="absolute top-2 right-2 flex items-center gap-1">
-        {/* Branch indicator - always visible when has branches */}
-        {hasBranches && onShowBranches && (
-          <button
-            onClick={() => onShowBranches(node.id)}
-            className="relative p-1.5 rounded-md bg-purple-100 text-purple-600 hover:bg-purple-200 hover:text-purple-700 transition-colors"
-            title={`${siblingCount} branches - click to switch`}
+        {/* Fork point indicator - shows when this node has multiple child branches */}
+        {isForkPoint && forkBranchCount > 1 && (
+          <div
+            className="relative p-1.5 rounded-md bg-purple-100 text-purple-600"
+            title={`${forkBranchCount} branches from this point`}
           >
             <GitBranch size={16} />
             <span className="absolute -top-1 -right-1 bg-purple-600 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-medium">
-              {siblingCount}
+              {forkBranchCount}
             </span>
-          </button>
+          </div>
         )}
 
         {/* Note button - appears on hover or when note exists */}

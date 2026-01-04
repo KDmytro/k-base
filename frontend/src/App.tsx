@@ -16,10 +16,8 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [replyToNode, setReplyToNode] = useState<Node | null>(null);
 
-  // Branch switching state
-  const [siblingCounts, setSiblingCounts] = useState<Map<string, number>>(new Map());
-  const [branchSwitcherNodeId, setBranchSwitcherNodeId] = useState<string | null>(null);
-  const [branchSwitcherSiblings, setBranchSwitcherSiblings] = useState<Node[]>([]);
+  // Fork point state (nodeId -> array of child branches for nodes that have multiple children)
+  const [forkPointBranches, setForkPointBranches] = useState<Map<string, Node[]>>(new Map());
 
   // Tree view state
   const [treeNodes, setTreeNodes] = useState<Node[]>([]);
@@ -47,10 +45,9 @@ function App() {
     if (currentSessionId) {
       loadSession(currentSessionId);
       setReplyToNode(null); // Clear any fork context when switching sessions
-      setBranchSwitcherNodeId(null);
-      setBranchSwitcherSiblings([]);
       setNotePanelNodeId(null);
       setNodeNotes(new Map());
+      setForkPointBranches(new Map());
       // Reset side chat state
       setSideChatPanelNodeId(null);
       setSideChatPanelNode(null);
@@ -63,9 +60,7 @@ function App() {
       setTreeNodes([]);
       setCurrentSession(null);
       setReplyToNode(null);
-      setSiblingCounts(new Map());
-      setBranchSwitcherNodeId(null);
-      setBranchSwitcherSiblings([]);
+      setForkPointBranches(new Map());
       setNotePanelNodeId(null);
       setNodeNotes(new Map());
       // Reset side chat state
@@ -102,7 +97,7 @@ function App() {
 
   const loadFullThread = async (rootNodeId: string): Promise<Node[]> => {
     const thread: Node[] = [];
-    const counts = new Map<string, number>();
+    const forkPoints = new Map<string, Node[]>();
     const notes = new Map<string, Node>();
     const sideChats = new Map<string, number>();
     const threads = new Map<string, string[]>();
@@ -112,10 +107,6 @@ function App() {
       try {
         const node = await apiClient.getNode(currentId);
         thread.push(node);
-
-        // Get siblings count for this node
-        const siblings = await apiClient.getNodeSiblings(currentId);
-        counts.set(currentId, siblings.length);
 
         // Load note for this node
         const note = await apiClient.getNote(currentId);
@@ -143,6 +134,12 @@ function App() {
         const mainConversationChildren = children.filter(
           (c) => c.nodeType === 'user_message' || c.nodeType === 'assistant_message'
         );
+
+        // If this node has multiple main children, it's a fork point
+        if (mainConversationChildren.length > 1) {
+          forkPoints.set(currentId, mainConversationChildren);
+        }
+
         const selectedChild = mainConversationChildren.find((c) => c.isSelectedPath);
         currentId = selectedChild?.id || null;
       } catch {
@@ -150,7 +147,7 @@ function App() {
       }
     }
 
-    setSiblingCounts(counts);
+    setForkPointBranches(forkPoints);
     setNodeNotes(notes);
     setSideChatCounts(sideChats);
     setSideChatThreads(threads);
@@ -180,32 +177,13 @@ function App() {
     setReplyToNode(null);
   }, []);
 
-  // Branch switching handlers
-  const handleShowBranches = useCallback(async (nodeId: string) => {
-    try {
-      const siblings = await apiClient.getNodeSiblings(nodeId);
-      setBranchSwitcherNodeId(nodeId);
-      setBranchSwitcherSiblings(siblings);
-    } catch (err) {
-      console.error('Failed to fetch siblings:', err);
-    }
-  }, []);
-
-  const handleCloseBranchSwitcher = useCallback(() => {
-    setBranchSwitcherNodeId(null);
-    setBranchSwitcherSiblings([]);
-  }, []);
-
+  // Branch switching handler
   const handleSelectBranch = useCallback(async (nodeId: string) => {
     if (!currentSession?.rootNodeId) return;
 
     try {
       // Mark this node as selected in the backend
       await apiClient.selectBranch(nodeId);
-
-      // Close the switcher
-      setBranchSwitcherNodeId(null);
-      setBranchSwitcherSiblings([]);
 
       // Reload the thread from root to show the new branch
       const fullThread = await loadFullThread(currentSession.rootNodeId);
@@ -436,12 +414,8 @@ function App() {
             onClearReply={handleClearReply}
             sessionName={currentSession?.name}
             // Branch switching props
-            siblingCounts={siblingCounts}
-            onShowBranches={handleShowBranches}
-            branchSwitcherNodeId={branchSwitcherNodeId}
-            branchSwitcherSiblings={branchSwitcherSiblings}
+            forkPointBranches={forkPointBranches}
             onSelectBranch={handleSelectBranch}
-            onCloseBranchSwitcher={handleCloseBranchSwitcher}
             // Streaming props
             streamingContent={streamingContent}
             isStreaming={isStreaming}

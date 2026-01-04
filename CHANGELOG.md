@@ -18,6 +18,13 @@ All notable changes to K-Base are documented in this file.
 - **Note panel**: Slide-out panel for adding/editing notes on any message
 - **Inline note display**: Notes appear below their parent message with yellow styling
 
+#### Inline Collapsed Branches
+- **Fork point indicators**: Branch icon now appears on parent nodes (fork points) instead of sibling nodes
+- **Inline collapsed branch cards**: Non-active branches appear as clickable preview cards at fork points
+- **First-line preview**: Collapsed branches show ~60 character preview with folder and user/bot icons
+- **Always visible**: Collapsed branches are always visible at fork points for easy navigation
+- **Removed dropdown**: Replaced BranchSwitcher modal with inline collapsed cards
+
 ### Fixed
 
 #### Branch Switching
@@ -49,6 +56,11 @@ All notable changes to K-Base are documented in this file.
 - Created `SideChatPanel` component (`frontend/src/components/chat/SideChatPanel.tsx`)
 - Created `NotePanel` component (`frontend/src/components/chat/NotePanel.tsx`)
 - Added `selectedText` to Node type (`frontend/src/types/models.ts`)
+- Created `CollapsedBranch` component for inline branch previews (`frontend/src/components/chat/CollapsedBranch.tsx`)
+- Replaced `siblingCounts` with `forkPointBranches` state in App.tsx for tracking fork points
+- Updated `ChatMessage` to show branch icon on fork points instead of siblings
+- Updated `ChatThread` to render inline collapsed branches at fork points
+- Removed `BranchSwitcher` dropdown component
 
 #### Database Migrations
 - `20260103_2253_add_side_chat_node_types.py`: Added side_chat_user and side_chat_assistant node types
