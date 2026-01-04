@@ -20,6 +20,10 @@ function App() {
   // Tree view state
   const [treeNodes, setTreeNodes] = useState<Node[]>([]);
 
+  // Streaming state
+  const [streamingContent, setStreamingContent] = useState<string>('');
+  const [isStreaming, setIsStreaming] = useState(false);
+
   // Load session nodes when session changes
   useEffect(() => {
     if (currentSessionId) {
@@ -169,43 +173,66 @@ function App() {
   const handleSendMessage = useCallback(async (message: string) => {
     if (!currentSessionId) return;
 
+    const isFork = !!replyToNode;
     setIsLoading(true);
+    setStreamingContent('');
 
-    try {
-      // Use replyToNode if forking, otherwise use last node
-      const parentNodeId = replyToNode
-        ? replyToNode.id
-        : (nodes.length > 0 ? nodes[nodes.length - 1].id : undefined);
+    // Use replyToNode if forking, otherwise use last node
+    const parentNodeId = replyToNode
+      ? replyToNode.id
+      : (nodes.length > 0 ? nodes[nodes.length - 1].id : undefined);
 
-      const response = await apiClient.sendMessage({
+    // Clear fork context early
+    if (replyToNode) {
+      setReplyToNode(null);
+    }
+
+    await apiClient.sendMessageStream(
+      {
         sessionId: currentSessionId,
         parentNodeId,
         content: message,
-      });
+      },
+      {
+        onUserNode: (userNode) => {
+          // Add user message immediately
+          if (isFork) {
+            // For forks, we'll reload the full thread at the end
+          } else {
+            setNodes((prev) => [...prev, userNode]);
+          }
+          setIsStreaming(true);
+          setIsLoading(false);
+        },
+        onToken: (token) => {
+          setStreamingContent((prev) => prev + token);
+        },
+        onComplete: async (assistantNode) => {
+          setIsStreaming(false);
+          setStreamingContent('');
 
-      // If we were forking, reload the full thread to show the new branch
-      if (replyToNode) {
-        setReplyToNode(null);
-        // Reload from the root to get the new branch as selected path
-        if (currentSession?.rootNodeId) {
-          const fullThread = await loadFullThread(currentSession.rootNodeId);
-          setNodes(fullThread);
-        }
-      } else {
-        // Normal case: just append the new nodes
-        setNodes((prev) => [...prev, response.userNode, response.assistantNode]);
+          if (isFork && currentSession?.rootNodeId) {
+            // Reload full thread for fork
+            const fullThread = await loadFullThread(currentSession.rootNodeId);
+            setNodes(fullThread);
+          } else {
+            // Append assistant node
+            setNodes((prev) => [...prev, assistantNode]);
+          }
+
+          // Refresh the tree to show new nodes
+          const tree = await apiClient.getSessionTree(currentSessionId);
+          setTreeNodes(tree);
+        },
+        onError: (error) => {
+          console.error('Failed to send message:', error);
+          setIsLoading(false);
+          setIsStreaming(false);
+          setStreamingContent('');
+          alert('Failed to send message. Please check your OpenAI API key in backend/.env');
+        },
       }
-
-      // Refresh the tree to show new nodes
-      const tree = await apiClient.getSessionTree(currentSessionId);
-      setTreeNodes(tree);
-    } catch (err) {
-      console.error('Failed to send message:', err);
-      // Show error to user
-      alert('Failed to send message. Please check your OpenAI API key in backend/.env');
-    } finally {
-      setIsLoading(false);
-    }
+    );
   }, [currentSessionId, nodes, replyToNode, currentSession]);
 
   return (
@@ -238,6 +265,9 @@ function App() {
             branchSwitcherSiblings={branchSwitcherSiblings}
             onSelectBranch={handleSelectBranch}
             onCloseBranchSwitcher={handleCloseBranchSwitcher}
+            // Streaming props
+            streamingContent={streamingContent}
+            isStreaming={isStreaming}
           />
         ) : (
           <div className="flex items-center justify-center h-full bg-gray-50">

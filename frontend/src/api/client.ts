@@ -180,6 +180,88 @@ class ApiClient {
       body: JSON.stringify(request),
     });
   }
+
+  // Streaming chat
+  async sendMessageStream(
+    request: ChatRequest,
+    callbacks: {
+      onUserNode: (node: Node) => void;
+      onToken: (token: string) => void;
+      onComplete: (node: Node) => void;
+      onError: (error: Error) => void;
+    }
+  ): Promise<void> {
+    const url = `${this.baseUrl}/chat/stream`;
+    const body = JSON.stringify(transformKeys(request, camelToSnake));
+
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body,
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`API Error: ${response.status} - ${errorText}`);
+      }
+
+      const reader = response.body?.getReader();
+      if (!reader) {
+        throw new Error('No response body');
+      }
+
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const jsonStr = line.slice(6).trim();
+            if (!jsonStr) continue;
+
+            try {
+              const event = JSON.parse(jsonStr);
+              const transformed = transformKeys<{
+                type: string;
+                node?: Node;
+                token?: string;
+              }>(event, snakeToCamel);
+
+              switch (transformed.type) {
+                case 'user_node':
+                  if (transformed.node) {
+                    callbacks.onUserNode(transformed.node);
+                  }
+                  break;
+                case 'token':
+                  if (transformed.token !== undefined) {
+                    callbacks.onToken(transformed.token);
+                  }
+                  break;
+                case 'complete':
+                  if (transformed.node) {
+                    callbacks.onComplete(transformed.node);
+                  }
+                  break;
+              }
+            } catch (parseError) {
+              console.error('Failed to parse SSE event:', parseError);
+            }
+          }
+        }
+      }
+    } catch (error) {
+      callbacks.onError(error instanceof Error ? error : new Error(String(error)));
+    }
+  }
 }
 
 export const apiClient = new ApiClient(API_BASE_URL);

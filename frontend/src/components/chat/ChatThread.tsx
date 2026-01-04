@@ -19,6 +19,9 @@ interface ChatThreadProps {
   branchSwitcherSiblings?: Node[];
   onSelectBranch?: (nodeId: string) => void;
   onCloseBranchSwitcher?: () => void;
+  // Streaming props
+  streamingContent?: string;
+  isStreaming?: boolean;
 }
 
 export function ChatThread({
@@ -35,12 +38,14 @@ export function ChatThread({
   branchSwitcherSiblings,
   onSelectBranch,
   onCloseBranchSwitcher,
+  streamingContent,
+  isStreaming,
 }: ChatThreadProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [nodes]);
+  }, [nodes, streamingContent]);
 
   return (
     <div className="flex flex-col h-full">
@@ -81,7 +86,25 @@ export function ChatThread({
                 )}
               </div>
             ))}
-            {isLoading && (
+            {/* Streaming response */}
+            {isStreaming && streamingContent && (
+              <div className="flex gap-3 p-4 bg-gray-50">
+                <div className="w-8 h-8 rounded-full bg-green-100 text-green-600 flex items-center justify-center flex-shrink-0">
+                  <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                  </svg>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium text-gray-500 mb-1">Assistant</div>
+                  <div className="text-gray-900 whitespace-pre-wrap break-words">
+                    {streamingContent}
+                    <span className="inline-block w-2 h-4 ml-0.5 bg-gray-400 animate-pulse" />
+                  </div>
+                </div>
+              </div>
+            )}
+            {/* Loading indicator (before streaming starts) */}
+            {isLoading && !isStreaming && (
               <div className="flex gap-3 p-4 bg-gray-50">
                 <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center">
                   <div className="animate-pulse">...</div>
@@ -100,7 +123,7 @@ export function ChatThread({
       {/* Input */}
       <ChatInput
         onSend={onSendMessage}
-        disabled={isLoading}
+        disabled={isLoading || isStreaming}
         placeholder={nodes.length === 0 ? 'Start a conversation...' : 'Continue the conversation...'}
         replyToNode={replyToNode}
         onClearReply={onClearReply}

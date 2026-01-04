@@ -1,4 +1,8 @@
 import { User, Bot, GitBranch } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import type { Node } from '@/types/models';
 
 interface ChatMessageProps {
@@ -31,8 +35,32 @@ export function ChatMessage({ node, siblingCount = 1, onFork, onShowBranches }: 
           {isUser ? 'You' : 'Assistant'}
           {isNote && <span className="ml-2 text-yellow-600">(Note)</span>}
         </div>
-        <div className="text-gray-900 whitespace-pre-wrap break-words">
-          {node.content}
+        <div className="text-gray-900 prose prose-sm max-w-none prose-pre:p-0 prose-pre:bg-transparent">
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm]}
+            components={{
+              code({ className, children, ...props }) {
+                const match = /language-(\w+)/.exec(className || '');
+                const isInline = !match;
+                return !isInline ? (
+                  <SyntaxHighlighter
+                    style={oneDark as Record<string, React.CSSProperties>}
+                    language={match[1]}
+                    PreTag="div"
+                    customStyle={{ margin: 0, borderRadius: '0.375rem' }}
+                  >
+                    {String(children).replace(/\n$/, '')}
+                  </SyntaxHighlighter>
+                ) : (
+                  <code className={`${className || ''} bg-gray-100 px-1 py-0.5 rounded text-sm`} {...props}>
+                    {children}
+                  </code>
+                );
+              },
+            }}
+          >
+            {node.content}
+          </ReactMarkdown>
         </div>
       </div>
 
