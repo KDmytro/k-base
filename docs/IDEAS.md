@@ -2,6 +2,10 @@
 
 Raw brainstorming and feature ideas for future development.
 
+## Deep Dive Documents
+
+- [Branch Merge Feature](./ai-merge.md) - Merging content from one branch into another
+
 ---
 
 ## Topic Management Enhancements

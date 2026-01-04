@@ -265,7 +265,7 @@ The project follows a phased implementation approach:
 
 ## Documentation
 
-For detailed technical specifications, architecture decisions, and implementation details, see [initial-spec.md](./initial-spec.md).
+For detailed technical specifications, architecture decisions, and implementation details, see [initial-spec.md](./docs/initial-spec.md).
 
 ## License
 

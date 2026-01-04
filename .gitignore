@@ -53,3 +53,4 @@ frontend/build/
 # Alembic
 # Note: Keep alembic/versions/* tracked
 alembic/__pycache__/
+.claude/
