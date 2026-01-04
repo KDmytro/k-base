@@ -1,12 +1,16 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { Sidebar } from '@/components/sidebar/Sidebar';
 import { ChatThread } from '@/components/chat/ChatThread';
 import { apiClient } from '@/api/client';
 import type { Node, Session } from '@/types/models';
 
 function App() {
-  const [currentTopicId, setCurrentTopicId] = useState<string | null>(null);
-  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+  const { topicId: urlTopicId, sessionId: urlSessionId } = useParams();
+  const navigate = useNavigate();
+
+  const currentTopicId = urlTopicId || null;
+  const currentSessionId = urlSessionId || null;
   const [currentSession, setCurrentSession] = useState<Session | null>(null);
   const [nodes, setNodes] = useState<Node[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -92,16 +96,15 @@ function App() {
   };
 
   const handleSelectTopic = (topicId: string) => {
-    setCurrentTopicId(topicId);
+    navigate(`/topic/${topicId}`);
   };
 
-  const handleSelectSession = (sessionId: string) => {
-    setCurrentSessionId(sessionId);
+  const handleSelectSession = (topicId: string, sessionId: string) => {
+    navigate(`/topic/${topicId}/session/${sessionId}`);
   };
 
   const handleNewSession = (topicId: string, sessionId: string) => {
-    setCurrentTopicId(topicId);
-    setCurrentSessionId(sessionId);
+    navigate(`/topic/${topicId}/session/${sessionId}`);
   };
 
   const handleForkNode = useCallback((nodeId: string) => {

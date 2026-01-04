@@ -8,7 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 import json
 
-from models.database import Session, Node, get_db
+from models.database import Session, Node, get_db, async_session_maker
 from models.schemas import ChatRequest, ChatResponse, NodeResponse
 from services.chat_service import chat_service
 
@@ -91,6 +91,8 @@ async def send_message_stream(
         parent_id=request.parent_node_id,
         content=request.content
     )
+    # Commit user node immediately so it's saved even if streaming fails
+    await db.commit()
 
     # Build conversation context
     path = []
@@ -99,27 +101,38 @@ async def send_message_stream(
 
     messages = chat_service.build_messages(path, request.content)
 
+    # Capture values needed in generator (db session will be closed)
+    session_id = request.session_id
+    user_node_id = user_node.id
+    user_node_response = NodeResponse.model_validate(user_node).model_dump(mode='json')
+
     async def stream_response():
         full_response = ""
 
         # Send user node info first
-        yield f"data: {json.dumps({'type': 'user_node', 'node': NodeResponse.model_validate(user_node).model_dump(mode='json')})}\n\n"
+        yield f"data: {json.dumps({'type': 'user_node', 'node': user_node_response})}\n\n"
 
         # Stream AI response tokens
         async for token in chat_service.generate_response_stream(messages):
             full_response += token
             yield f"data: {json.dumps({'type': 'token', 'token': token})}\n\n"
 
-        # Create assistant node with full response
-        assistant_node = await chat_service.create_assistant_node(
-            db=db,
-            session_id=request.session_id,
-            parent_id=user_node.id,
-            content=full_response
-        )
+        # Create assistant node with full response using a NEW database session
+        async with async_session_maker() as stream_db:
+            try:
+                assistant_node = await chat_service.create_assistant_node(
+                    db=stream_db,
+                    session_id=session_id,
+                    parent_id=user_node_id,
+                    content=full_response
+                )
+                await stream_db.commit()
 
-        # Send completion with assistant node
-        yield f"data: {json.dumps({'type': 'complete', 'node': NodeResponse.model_validate(assistant_node).model_dump(mode='json')})}\n\n"
+                # Send completion with assistant node
+                yield f"data: {json.dumps({'type': 'complete', 'node': NodeResponse.model_validate(assistant_node).model_dump(mode='json')})}\n\n"
+            except Exception as e:
+                await stream_db.rollback()
+                yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
 
     return StreamingResponse(
         stream_response(),

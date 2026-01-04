@@ -140,6 +140,13 @@ class ApiClient {
     });
   }
 
+  async updateSession(id: string, data: { name?: string; description?: string }): Promise<Session> {
+    return this.request<Session>(`/sessions/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  }
+
   async deleteSession(id: string): Promise<void> {
     await this.request<void>(`/sessions/${id}`, {
       method: 'DELETE',
@@ -214,49 +221,57 @@ class ApiClient {
       const decoder = new TextDecoder();
       let buffer = '';
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
+      const processLine = (line: string) => {
+        if (line.startsWith('data: ')) {
+          const jsonStr = line.slice(6).trim();
+          if (!jsonStr) return;
 
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
+          try {
+            const event = JSON.parse(jsonStr);
+            const transformed = transformKeys<{
+              type: string;
+              node?: Node;
+              token?: string;
+            }>(event, snakeToCamel);
 
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            const jsonStr = line.slice(6).trim();
-            if (!jsonStr) continue;
-
-            try {
-              const event = JSON.parse(jsonStr);
-              const transformed = transformKeys<{
-                type: string;
-                node?: Node;
-                token?: string;
-              }>(event, snakeToCamel);
-
-              switch (transformed.type) {
-                case 'user_node':
-                  if (transformed.node) {
-                    callbacks.onUserNode(transformed.node);
-                  }
-                  break;
-                case 'token':
-                  if (transformed.token !== undefined) {
-                    callbacks.onToken(transformed.token);
-                  }
-                  break;
-                case 'complete':
-                  if (transformed.node) {
-                    callbacks.onComplete(transformed.node);
-                  }
-                  break;
-              }
-            } catch (parseError) {
-              console.error('Failed to parse SSE event:', parseError);
+            switch (transformed.type) {
+              case 'user_node':
+                if (transformed.node) {
+                  callbacks.onUserNode(transformed.node);
+                }
+                break;
+              case 'token':
+                if (transformed.token !== undefined) {
+                  callbacks.onToken(transformed.token);
+                }
+                break;
+              case 'complete':
+                if (transformed.node) {
+                  callbacks.onComplete(transformed.node);
+                }
+                break;
             }
+          } catch (parseError) {
+            console.error('Failed to parse SSE event:', parseError);
           }
         }
+      };
+
+      while (true) {
+        const { done, value } = await reader.read();
+
+        if (value) {
+          buffer += decoder.decode(value, { stream: !done });
+        }
+
+        const lines = buffer.split('\n');
+        buffer = done ? '' : (lines.pop() || '');
+
+        for (const line of lines) {
+          processLine(line);
+        }
+
+        if (done) break;
       }
     } catch (error) {
       callbacks.onError(error instanceof Error ? error : new Error(String(error)));

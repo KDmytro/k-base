@@ -220,13 +220,14 @@ The project follows a phased implementation approach:
 - [x] Sidebar for topic/session management
 - [x] API client with snake_case/camelCase conversion
 
-### Phase 2: Branching (IN PROGRESS)
+### Phase 2: Branching ✅ (COMPLETE)
 - [x] Branch creation (fork from any node)
 - [x] Branch selection UI (indicator + dropdown switcher)
-- [ ] Tree rendering in frontend (visual tree view)
-- [ ] Breadcrumb navigation
-- [ ] Regenerate response
-- [ ] Streaming responses via WebSocket
+- [x] Tree rendering in frontend (mini tree sidebar with SVG visualization)
+- [x] Streaming responses via SSE (real-time token streaming)
+- [x] Markdown rendering with syntax highlighting
+- [x] Session renaming (double-click or pencil icon)
+- [x] URL routing (`/topic/:id/session/:id` for deep linking)
 
 ### Phase 3: Collapse & Notes
 - [ ] Collapse branch functionality
@@ -251,10 +252,10 @@ The project follows a phased implementation approach:
 
 ## Next Steps
 
-1. **Tree Visualization**: Render conversation as a visual tree structure
-2. **Breadcrumb Navigation**: Show current path in the conversation tree
-3. **Regenerate Response**: Allow regenerating AI responses (creates sibling branch)
-4. **Streaming Responses**: Add SSE/WebSocket for real-time token streaming
+1. **Collapse Branches**: Hide tangent details with AI-generated summaries
+2. **User Notes**: Add notes to any node in the conversation
+3. **Regenerate Response**: Re-roll AI responses (creates sibling branch)
+4. **RAG Integration**: Shared memory across sessions via embeddings
 
 ## Documentation
 

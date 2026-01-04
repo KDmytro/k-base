@@ -51,6 +51,28 @@ async def get_session(
     return session
 
 
+@router.patch("/{session_id}", response_model=SessionResponse)
+async def update_session(
+    session_id: UUID,
+    update: SessionUpdate,
+    db: AsyncSession = Depends(get_db)
+) -> Session:
+    """Update a session."""
+    result = await db.execute(select(Session).where(Session.id == session_id))
+    session = result.scalar_one_or_none()
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    if update.name is not None:
+        session.name = update.name
+    if update.description is not None:
+        session.description = update.description
+
+    await db.flush()
+    await db.refresh(session)
+    return session
+
+
 @router.delete("/{session_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_session(
     session_id: UUID,

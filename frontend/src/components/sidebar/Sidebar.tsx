@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, MessageSquare, FolderOpen, GitBranch } from 'lucide-react';
+import { Plus, MessageSquare, FolderOpen, GitBranch, Pencil } from 'lucide-react';
 import { apiClient } from '@/api/client';
 import { TreeView } from './TreeView';
 import type { Topic, Session, Node } from '@/types/models';
@@ -8,7 +8,7 @@ interface SidebarProps {
   currentTopicId: string | null;
   currentSessionId: string | null;
   onSelectTopic: (topicId: string) => void;
-  onSelectSession: (sessionId: string) => void;
+  onSelectSession: (topicId: string, sessionId: string) => void;
   onNewSession: (topicId: string, sessionId: string) => void;
   // Tree view props
   treeNodes?: Node[];
@@ -31,6 +31,8 @@ export function Sidebar({
   const [expandedTopics, setExpandedTopics] = useState<Set<string>>(new Set());
   const [isCreatingTopic, setIsCreatingTopic] = useState(false);
   const [newTopicName, setNewTopicName] = useState('');
+  const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
+  const [editingSessionName, setEditingSessionName] = useState('');
 
   useEffect(() => {
     loadTopics();
@@ -96,6 +98,38 @@ export function Sidebar({
       onNewSession(topicId, session.id);
     } catch (err) {
       console.error('Failed to create session:', err);
+    }
+  };
+
+  const handleStartRename = (session: Session) => {
+    setEditingSessionId(session.id);
+    setEditingSessionName(session.name);
+  };
+
+  const handleRenameSession = async (topicId: string) => {
+    if (!editingSessionId || !editingSessionName.trim()) {
+      setEditingSessionId(null);
+      return;
+    }
+
+    try {
+      const updated = await apiClient.updateSession(editingSessionId, {
+        name: editingSessionName.trim(),
+      });
+      setSessions((prev) => {
+        const newMap = new Map(prev);
+        const topicSessions = newMap.get(topicId) || [];
+        newMap.set(
+          topicId,
+          topicSessions.map((s) => (s.id === updated.id ? updated : s))
+        );
+        return newMap;
+      });
+    } catch (err) {
+      console.error('Failed to rename session:', err);
+    } finally {
+      setEditingSessionId(null);
+      setEditingSessionName('');
     }
   };
 
@@ -167,16 +201,44 @@ export function Sidebar({
             {expandedTopics.has(topic.id) && (
               <div className="ml-4 border-l border-gray-700">
                 {(sessions.get(topic.id) || []).map((session) => (
-                  <button
-                    key={session.id}
-                    onClick={() => onSelectSession(session.id)}
-                    className={`w-full flex items-center gap-2 px-4 py-2 text-sm hover:bg-gray-800 ${
-                      currentSessionId === session.id ? 'bg-gray-700' : ''
-                    }`}
-                  >
-                    <MessageSquare size={14} className="text-gray-500" />
-                    <span className="truncate text-gray-300">{session.name}</span>
-                  </button>
+                  <div key={session.id} className="group relative">
+                    {editingSessionId === session.id ? (
+                      <div className="flex items-center gap-1 px-4 py-1.5">
+                        <MessageSquare size={14} className="text-gray-500 flex-shrink-0" />
+                        <input
+                          type="text"
+                          value={editingSessionName}
+                          onChange={(e) => setEditingSessionName(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') handleRenameSession(topic.id);
+                            if (e.key === 'Escape') setEditingSessionId(null);
+                          }}
+                          onBlur={() => handleRenameSession(topic.id)}
+                          className="flex-1 px-1 py-0.5 bg-gray-800 rounded text-sm text-white min-w-0"
+                          autoFocus
+                        />
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => onSelectSession(topic.id, session.id)}
+                        onDoubleClick={() => handleStartRename(session)}
+                        className={`w-full flex items-center gap-2 px-4 py-2 text-sm hover:bg-gray-800 ${
+                          currentSessionId === session.id ? 'bg-gray-700' : ''
+                        }`}
+                      >
+                        <MessageSquare size={14} className="text-gray-500 flex-shrink-0" />
+                        <span className="truncate text-gray-300 flex-1 text-left">{session.name}</span>
+                        <Pencil
+                          size={12}
+                          className="text-gray-500 opacity-0 group-hover:opacity-100 hover:text-gray-300 flex-shrink-0"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleStartRename(session);
+                          }}
+                        />
+                      </button>
+                    )}
+                  </div>
                 ))}
                 <button
                   onClick={() => handleCreateSession(topic.id)}
