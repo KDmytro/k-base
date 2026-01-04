@@ -146,6 +146,10 @@ class ApiClient {
     });
   }
 
+  async getSessionTree(sessionId: string): Promise<Node[]> {
+    return this.request<Node[]>(`/sessions/${sessionId}/tree`);
+  }
+
   // Nodes
   async getNode(id: string): Promise<Node> {
     return this.request<Node>(`/nodes/${id}`);

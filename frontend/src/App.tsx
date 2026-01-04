@@ -17,6 +17,9 @@ function App() {
   const [branchSwitcherNodeId, setBranchSwitcherNodeId] = useState<string | null>(null);
   const [branchSwitcherSiblings, setBranchSwitcherSiblings] = useState<Node[]>([]);
 
+  // Tree view state
+  const [treeNodes, setTreeNodes] = useState<Node[]>([]);
+
   // Load session nodes when session changes
   useEffect(() => {
     if (currentSessionId) {
@@ -26,6 +29,7 @@ function App() {
       setBranchSwitcherSiblings([]);
     } else {
       setNodes([]);
+      setTreeNodes([]);
       setCurrentSession(null);
       setReplyToNode(null);
       setSiblingCounts(new Map());
@@ -38,6 +42,10 @@ function App() {
     try {
       const session = await apiClient.getSession(sessionId);
       setCurrentSession(session);
+
+      // Load the full tree for the tree view
+      const tree = await apiClient.getSessionTree(sessionId);
+      setTreeNodes(tree);
 
       // Load the conversation path if there's a root node
       if (session.rootNodeId) {
@@ -138,6 +146,26 @@ function App() {
     }
   }, [currentSession]);
 
+  // Tree view navigation handler
+  const handleTreeNavigate = useCallback(async (nodeId: string) => {
+    if (!currentSession?.rootNodeId || !currentSessionId) return;
+
+    try {
+      // Mark this node as selected in the backend
+      await apiClient.selectBranch(nodeId);
+
+      // Reload the thread to show the path to the selected node
+      const fullThread = await loadFullThread(currentSession.rootNodeId);
+      setNodes(fullThread);
+
+      // Refresh the tree to update visual selection
+      const tree = await apiClient.getSessionTree(currentSessionId);
+      setTreeNodes(tree);
+    } catch (err) {
+      console.error('Failed to navigate tree:', err);
+    }
+  }, [currentSession, currentSessionId]);
+
   const handleSendMessage = useCallback(async (message: string) => {
     if (!currentSessionId) return;
 
@@ -167,6 +195,10 @@ function App() {
         // Normal case: just append the new nodes
         setNodes((prev) => [...prev, response.userNode, response.assistantNode]);
       }
+
+      // Refresh the tree to show new nodes
+      const tree = await apiClient.getSessionTree(currentSessionId);
+      setTreeNodes(tree);
     } catch (err) {
       console.error('Failed to send message:', err);
       // Show error to user
@@ -184,6 +216,9 @@ function App() {
         onSelectTopic={handleSelectTopic}
         onSelectSession={handleSelectSession}
         onNewSession={handleNewSession}
+        treeNodes={treeNodes}
+        currentPath={nodes.map(n => n.id)}
+        onSelectTreeNode={handleTreeNavigate}
       />
 
       <div className="flex-1 flex flex-col">

@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Plus, MessageSquare, FolderOpen } from 'lucide-react';
+import { Plus, MessageSquare, FolderOpen, GitBranch } from 'lucide-react';
 import { apiClient } from '@/api/client';
-import type { Topic, Session } from '@/types/models';
+import { TreeView } from './TreeView';
+import type { Topic, Session, Node } from '@/types/models';
 
 interface SidebarProps {
   currentTopicId: string | null;
@@ -9,6 +10,10 @@ interface SidebarProps {
   onSelectTopic: (topicId: string) => void;
   onSelectSession: (sessionId: string) => void;
   onNewSession: (topicId: string, sessionId: string) => void;
+  // Tree view props
+  treeNodes?: Node[];
+  currentPath?: string[];
+  onSelectTreeNode?: (nodeId: string) => void;
 }
 
 export function Sidebar({
@@ -17,6 +22,9 @@ export function Sidebar({
   onSelectTopic,
   onSelectSession,
   onNewSession,
+  treeNodes,
+  currentPath,
+  onSelectTreeNode,
 }: SidebarProps) {
   const [topics, setTopics] = useState<Topic[]>([]);
   const [sessions, setSessions] = useState<Map<string, Session[]>>(new Map());
@@ -182,6 +190,23 @@ export function Sidebar({
           </div>
         ))}
       </div>
+
+      {/* Tree View Section */}
+      {currentSessionId && treeNodes && treeNodes.length > 0 && onSelectTreeNode && (
+        <div className="border-t border-gray-700">
+          <div className="px-4 py-2 flex items-center gap-2 text-sm text-gray-400">
+            <GitBranch size={14} />
+            <span>Tree View</span>
+          </div>
+          <div className="px-2 pb-2 overflow-x-auto">
+            <TreeView
+              nodes={treeNodes}
+              currentPath={currentPath || []}
+              onSelectNode={onSelectTreeNode}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

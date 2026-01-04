@@ -65,6 +65,27 @@ async def delete_session(
     await db.delete(session)
 
 
+@router.get("/{session_id}/tree", response_model=List[NodeResponse])
+async def get_session_tree(
+    session_id: UUID,
+    db: AsyncSession = Depends(get_db)
+) -> List[Node]:
+    """Get the full tree of nodes for a session."""
+    # Verify session exists
+    result = await db.execute(select(Session).where(Session.id == session_id))
+    session = result.scalar_one_or_none()
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    # Get all nodes for this session, ordered by creation time
+    result = await db.execute(
+        select(Node)
+        .where(Node.session_id == session_id)
+        .order_by(Node.created_at)
+    )
+    return list(result.scalars().all())
+
+
 # Nested route for sessions within a topic
 topics_sessions_router = APIRouter(prefix="/topics/{topic_id}/sessions", tags=["sessions"])
 
