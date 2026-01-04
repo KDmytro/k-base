@@ -180,6 +180,134 @@ class ApiClient {
     });
   }
 
+  // Notes
+  async addNote(nodeId: string, content: string): Promise<Node> {
+    return this.request<Node>(`/nodes/${nodeId}/note`, {
+      method: 'POST',
+      body: JSON.stringify({ content }),
+    });
+  }
+
+  async getNote(nodeId: string): Promise<Node | null> {
+    try {
+      return await this.request<Node>(`/nodes/${nodeId}/note`);
+    } catch {
+      return null; // Note not found
+    }
+  }
+
+  async deleteNote(nodeId: string): Promise<void> {
+    await this.request<void>(`/nodes/${nodeId}/note`, {
+      method: 'DELETE',
+    });
+  }
+
+  // Side Chats
+  async getSideChatThreads(nodeId: string): Promise<{ selectedText: string | null; count: number }[]> {
+    return this.request<{ selectedText: string | null; count: number }[]>(
+      `/nodes/${nodeId}/side-chat-threads`
+    );
+  }
+
+  async getSideChats(nodeId: string, selectedText?: string): Promise<Node[]> {
+    const params = selectedText !== undefined
+      ? `?selected_text=${encodeURIComponent(selectedText)}`
+      : '';
+    return this.request<Node[]>(`/nodes/${nodeId}/side-chats${params}`);
+  }
+
+  async sendSideChatStream(
+    parentNodeId: string,
+    content: string,
+    selectedText: string | undefined,
+    includeMainContext: boolean,
+    callbacks: {
+      onUserNode: (node: Node) => void;
+      onToken: (token: string) => void;
+      onComplete: (node: Node) => void;
+      onError: (error: Error) => void;
+    }
+  ): Promise<void> {
+    const url = `${this.baseUrl}/chat/side-chat/stream`;
+    const body = JSON.stringify(transformKeys({ parentNodeId, content, selectedText, includeMainContext }, camelToSnake));
+
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body,
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`API Error: ${response.status} - ${errorText}`);
+      }
+
+      const reader = response.body?.getReader();
+      if (!reader) {
+        throw new Error('No response body');
+      }
+
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      const processLine = (line: string) => {
+        if (line.startsWith('data: ')) {
+          const jsonStr = line.slice(6).trim();
+          if (!jsonStr) return;
+
+          try {
+            const event = JSON.parse(jsonStr);
+            const transformed = transformKeys<{
+              type: string;
+              node?: Node;
+              token?: string;
+            }>(event, snakeToCamel);
+
+            switch (transformed.type) {
+              case 'user_node':
+                if (transformed.node) {
+                  callbacks.onUserNode(transformed.node);
+                }
+                break;
+              case 'token':
+                if (transformed.token !== undefined) {
+                  callbacks.onToken(transformed.token);
+                }
+                break;
+              case 'complete':
+                if (transformed.node) {
+                  callbacks.onComplete(transformed.node);
+                }
+                break;
+            }
+          } catch (parseError) {
+            console.error('Failed to parse SSE event:', parseError);
+          }
+        }
+      };
+
+      while (true) {
+        const { done, value } = await reader.read();
+
+        if (value) {
+          buffer += decoder.decode(value, { stream: !done });
+        }
+
+        const lines = buffer.split('\n');
+        buffer = done ? '' : (lines.pop() || '');
+
+        for (const line of lines) {
+          processLine(line);
+        }
+
+        if (done) break;
+      }
+    } catch (error) {
+      callbacks.onError(error instanceof Error ? error : new Error(String(error)));
+    }
+  }
+
   // Chat
   async sendMessage(request: ChatRequest): Promise<ChatResponse> {
     return this.request<ChatResponse>('/chat', {

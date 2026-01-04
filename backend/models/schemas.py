@@ -98,6 +98,11 @@ class NodeUpdate(BaseModel):
     is_selected_path: Optional[bool] = None
 
 
+class NoteRequest(BaseModel):
+    """Schema for creating/updating a note on a node."""
+    content: str
+
+
 class NodeResponse(BaseModel):
     """Schema for node responses."""
     id: uuid.UUID
@@ -112,6 +117,7 @@ class NodeResponse(BaseModel):
     token_count: Optional[int]
     sibling_index: int
     is_selected_path: bool
+    selected_text: Optional[str] = None  # For side chat nodes - the text that started this thread
     created_at: datetime
     updated_at: datetime
 
@@ -137,6 +143,14 @@ class ChatResponse(BaseModel):
     user_node: NodeResponse
     assistant_node: NodeResponse
     memories_used: List[uuid.UUID] = []  # IDs of memory chunks used
+
+
+class SideChatRequest(BaseModel):
+    """Request to send a message in a side chat."""
+    parent_node_id: uuid.UUID  # The main thread message this side chat is attached to
+    content: str
+    selected_text: Optional[str] = None  # Optional text selection from parent message
+    include_main_context: bool = False  # Include main thread context even with selected text
 
 
 # ============================================

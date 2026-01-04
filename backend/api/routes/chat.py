@@ -8,8 +8,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 import json
 
-from models.database import Session, Node, get_db, async_session_maker
-from models.schemas import ChatRequest, ChatResponse, NodeResponse
+from models.database import Session, Node, NodeType, get_db, async_session_maker
+from models.schemas import ChatRequest, ChatResponse, NodeResponse, SideChatRequest
 from services.chat_service import chat_service
 
 router = APIRouter(prefix="/chat", tags=["chat"])
@@ -125,6 +125,96 @@ async def send_message_stream(
                     session_id=session_id,
                     parent_id=user_node_id,
                     content=full_response
+                )
+                await stream_db.commit()
+
+                # Send completion with assistant node
+                yield f"data: {json.dumps({'type': 'complete', 'node': NodeResponse.model_validate(assistant_node).model_dump(mode='json')})}\n\n"
+            except Exception as e:
+                await stream_db.rollback()
+                yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+
+    return StreamingResponse(
+        stream_response(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+        }
+    )
+
+
+@router.post("/side-chat/stream")
+async def send_side_chat_stream(
+    request: SideChatRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    """Send a message in a side chat and get streaming AI response."""
+    # Verify parent node exists
+    result = await db.execute(select(Node).where(Node.id == request.parent_node_id))
+    parent_node = result.scalar_one_or_none()
+    if not parent_node:
+        raise HTTPException(status_code=404, detail="Parent node not found")
+
+    # Get the main conversation path up to the parent node
+    main_path = await chat_service.get_conversation_path(db, request.parent_node_id)
+
+    # Get existing side chat history
+    result = await db.execute(
+        select(Node)
+        .where(
+            Node.parent_id == request.parent_node_id,
+            Node.node_type.in_([NodeType.SIDE_CHAT_USER, NodeType.SIDE_CHAT_ASSISTANT])
+        )
+        .order_by(Node.created_at)
+    )
+    side_chat_history = list(result.scalars().all())
+
+    # Create user side chat node
+    user_node = await chat_service.create_user_node(
+        db=db,
+        session_id=parent_node.session_id,
+        parent_id=request.parent_node_id,
+        content=request.content,
+        node_type='side_chat_user',
+        selected_text=request.selected_text  # Store the text that started this thread
+    )
+    await db.commit()
+
+    # Build side chat context
+    messages = chat_service.build_side_chat_messages(
+        main_path, side_chat_history, request.content, request.selected_text,
+        request.include_main_context
+    )
+
+    # Capture values for generator
+    session_id = parent_node.session_id
+    user_node_id = user_node.id
+    parent_node_id = request.parent_node_id
+    selected_text = request.selected_text  # Capture for assistant node
+    user_node_response = NodeResponse.model_validate(user_node).model_dump(mode='json')
+
+    async def stream_response():
+        full_response = ""
+
+        # Send user node info first
+        yield f"data: {json.dumps({'type': 'user_node', 'node': user_node_response})}\n\n"
+
+        # Stream AI response tokens
+        async for token in chat_service.generate_response_stream(messages):
+            full_response += token
+            yield f"data: {json.dumps({'type': 'token', 'token': token})}\n\n"
+
+        # Create assistant node with full response using a NEW database session
+        async with async_session_maker() as stream_db:
+            try:
+                assistant_node = await chat_service.create_assistant_node(
+                    db=stream_db,
+                    session_id=session_id,
+                    parent_id=parent_node_id,  # Side chat assistant is also child of parent node
+                    content=full_response,
+                    node_type='side_chat_assistant',
+                    selected_text=selected_text  # Store the same text as the user node
                 )
                 await stream_db.commit()
 

@@ -78,6 +78,58 @@ more informed and consistent responses, but don't explicitly reference
 
         return messages
 
+    def build_side_chat_messages(
+        self,
+        main_path: List[Node],
+        side_chat_history: List[Node],
+        user_message: str,
+        selected_text: str = None,
+        include_main_context: bool = False
+    ) -> List[Dict[str, str]]:
+        """Build messages for side chat with main thread context."""
+        # Build system prompt based on whether there's selected text
+        if selected_text:
+            system_content = f"""You are a helpful AI assistant having a side conversation.
+The user has selected the following text from the conversation and wants to discuss it:
+
+"{selected_text}"
+
+Focus your responses on this specific selection. Be concise and relevant to the selected text."""
+        else:
+            system_content = """You are a helpful AI assistant having a side conversation.
+The user is asking a follow-up question about a specific message in the main conversation.
+Keep your responses focused and concise since this is a tangent discussion.
+The main conversation context is provided for reference."""
+
+        messages = [{"role": "system", "content": system_content}]
+
+        # Add main thread context (summarized) - if no selected text OR explicitly requested
+        if main_path and (not selected_text or include_main_context):
+            context_summary = []
+            for node in main_path[-5:]:  # Last 5 messages for context
+                if node.node_type == 'user_message':
+                    context_summary.append(f"User: {node.content[:200]}...")
+                elif node.node_type == 'assistant_message':
+                    context_summary.append(f"Assistant: {node.content[:200]}...")
+
+            if context_summary:
+                messages.append({
+                    "role": "system",
+                    "content": f"[Main conversation context:\n" + "\n".join(context_summary) + "]"
+                })
+
+        # Add side chat history
+        for node in side_chat_history:
+            if node.node_type == 'side_chat_user':
+                messages.append({"role": "user", "content": node.content})
+            elif node.node_type == 'side_chat_assistant':
+                messages.append({"role": "assistant", "content": node.content})
+
+        # Add the new user message
+        messages.append({"role": "user", "content": user_message})
+
+        return messages
+
     async def generate_response(
         self,
         messages: List[Dict[str, str]],
@@ -120,15 +172,24 @@ more informed and consistent responses, but don't explicitly reference
         db: AsyncSession,
         session_id: UUID,
         parent_id: UUID | None,
-        content: str
+        content: str,
+        node_type: str = 'user_message',
+        selected_text: str = None
     ) -> Node:
         """Create a user message node."""
-        # Calculate sibling index if branching
+        # For side chat messages, don't do sibling tracking
+        is_side_chat = node_type == 'side_chat_user'
+
+        # Calculate sibling index if branching (only for main chat)
         sibling_index = 0
         siblings = []
-        if parent_id:
+        if parent_id and not is_side_chat:
+            # Only count siblings of the same type (excludes notes and side chats)
             result = await db.execute(
-                select(Node).where(Node.parent_id == parent_id)
+                select(Node).where(
+                    Node.parent_id == parent_id,
+                    Node.node_type == node_type
+                )
             )
             siblings = result.scalars().all()
             sibling_index = len(siblings)
@@ -142,16 +203,17 @@ more informed and consistent responses, but don't explicitly reference
             session_id=session_id,
             parent_id=parent_id,
             content=content,
-            node_type='user_message',
+            node_type=node_type,
             sibling_index=sibling_index,
-            is_selected_path=True  # New branch is always selected
+            is_selected_path=not is_side_chat,  # Side chat nodes don't participate in path
+            selected_text=selected_text if is_side_chat else None  # Only store for side chats
         )
         db.add(node)
         await db.flush()
         await db.refresh(node)
 
-        # Update session root_node_id if this is the first node
-        if not parent_id:
+        # Update session root_node_id if this is the first node (only for main chat)
+        if not parent_id and not is_side_chat:
             result = await db.execute(
                 select(Session).where(Session.id == session_id)
             )
@@ -168,15 +230,20 @@ more informed and consistent responses, but don't explicitly reference
         session_id: UUID,
         parent_id: UUID,
         content: str,
-        generation_config: Dict[str, Any] = None
+        generation_config: Dict[str, Any] = None,
+        node_type: str = 'assistant_message',
+        selected_text: str = None
     ) -> Node:
         """Create an assistant message node."""
+        is_side_chat = node_type == 'side_chat_assistant'
+
         node = Node(
             session_id=session_id,
             parent_id=parent_id,
             content=content,
-            node_type='assistant_message',
-            is_selected_path=True,  # Assistant response is part of selected path
+            node_type=node_type,
+            is_selected_path=not is_side_chat,  # Side chat nodes don't participate in path
+            selected_text=selected_text if is_side_chat else None,  # Only store for side chats
             generation_config=generation_config or {
                 "provider": "openai",
                 "model": self.default_model,

@@ -1,7 +1,10 @@
 import { useEffect, useRef } from 'react';
+import { StickyNote } from 'lucide-react';
 import { ChatMessage } from './ChatMessage';
 import { ChatInput } from './ChatInput';
 import { BranchSwitcher } from './BranchSwitcher';
+import { NotePanel } from './NotePanel';
+import { SideChatPanel } from './SideChatPanel';
 import type { Node } from '@/types/models';
 
 interface ChatThreadProps {
@@ -22,6 +25,25 @@ interface ChatThreadProps {
   // Streaming props
   streamingContent?: string;
   isStreaming?: boolean;
+  // Note props
+  nodeNotes?: Map<string, Node>;
+  notePanelNodeId?: string | null;
+  onOpenNotePanel?: (nodeId: string) => void;
+  onCloseNotePanel?: () => void;
+  onSaveNote?: (nodeId: string, content: string) => void;
+  onDeleteNote?: (nodeId: string) => void;
+  // Side chat props
+  sideChatCounts?: Map<string, number>;
+  sideChatThreads?: Map<string, string[]>;  // nodeId -> array of selected texts for highlighting
+  sideChatPanelNodeId?: string | null;
+  sideChatPanelNode?: Node | null;
+  sideChatSelectedText?: string | null;
+  sideChatMessages?: Node[];
+  sideChatStreamingContent?: string;
+  isSideChatStreaming?: boolean;
+  onOpenSideChat?: (nodeId: string, selectedText?: string) => void;
+  onCloseSideChat?: () => void;
+  onSendSideChat?: (content: string, includeMainContext: boolean) => void;
 }
 
 export function ChatThread({
@@ -40,6 +62,23 @@ export function ChatThread({
   onCloseBranchSwitcher,
   streamingContent,
   isStreaming,
+  nodeNotes,
+  notePanelNodeId,
+  onOpenNotePanel,
+  onCloseNotePanel,
+  onSaveNote,
+  onDeleteNote,
+  sideChatCounts,
+  sideChatThreads,
+  sideChatPanelNodeId,
+  sideChatPanelNode,
+  sideChatSelectedText,
+  sideChatMessages,
+  sideChatStreamingContent,
+  isSideChatStreaming,
+  onOpenSideChat,
+  onCloseSideChat,
+  onSendSideChat,
 }: ChatThreadProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -67,25 +106,45 @@ export function ChatThread({
           </div>
         ) : (
           <div className="divide-y">
-            {nodes.map((node) => (
-              <div key={node.id} className="relative">
-                <ChatMessage
-                  node={node}
-                  siblingCount={siblingCounts?.get(node.id) ?? 1}
-                  onFork={onForkNode}
-                  onShowBranches={onShowBranches}
-                />
-                {/* Branch switcher dropdown */}
-                {branchSwitcherNodeId === node.id && branchSwitcherSiblings && onSelectBranch && onCloseBranchSwitcher && (
-                  <BranchSwitcher
-                    siblings={branchSwitcherSiblings}
-                    currentNodeId={node.id}
-                    onSelect={onSelectBranch}
-                    onClose={onCloseBranchSwitcher}
+            {nodes.map((node) => {
+              const note = nodeNotes?.get(node.id);
+              return (
+                <div key={node.id} className="relative">
+                  <ChatMessage
+                    node={node}
+                    siblingCount={siblingCounts?.get(node.id) ?? 1}
+                    onFork={onForkNode}
+                    onShowBranches={onShowBranches}
+                    note={note}
+                    onNote={onOpenNotePanel}
+                    sideChatCount={sideChatCounts?.get(node.id) ?? 0}
+                    highlightedTexts={sideChatThreads?.get(node.id)}
+                    onSideChat={onOpenSideChat}
                   />
-                )}
-              </div>
-            ))}
+                  {/* Inline note display */}
+                  {note && (
+                    <div
+                      className="mx-4 mb-2 p-2 bg-yellow-50 border border-yellow-200 rounded-md cursor-pointer hover:bg-yellow-100 transition-colors"
+                      onClick={() => onOpenNotePanel?.(node.id)}
+                    >
+                      <div className="flex items-start gap-2">
+                        <StickyNote size={14} className="text-yellow-600 mt-0.5 flex-shrink-0" />
+                        <p className="text-sm text-yellow-800">{note.content}</p>
+                      </div>
+                    </div>
+                  )}
+                  {/* Branch switcher dropdown */}
+                  {branchSwitcherNodeId === node.id && branchSwitcherSiblings && onSelectBranch && onCloseBranchSwitcher && (
+                    <BranchSwitcher
+                      siblings={branchSwitcherSiblings}
+                      currentNodeId={node.id}
+                      onSelect={onSelectBranch}
+                      onClose={onCloseBranchSwitcher}
+                    />
+                  )}
+                </div>
+              );
+            })}
             {/* Streaming response */}
             {isStreaming && streamingContent && (
               <div className="flex gap-3 p-4 bg-gray-50">
@@ -128,6 +187,29 @@ export function ChatThread({
         replyToNode={replyToNode}
         onClearReply={onClearReply}
       />
+
+      {/* Note slide-out panel */}
+      {notePanelNodeId && onCloseNotePanel && onSaveNote && (
+        <NotePanel
+          existingContent={nodeNotes?.get(notePanelNodeId)?.content}
+          onSave={(content) => onSaveNote(notePanelNodeId, content)}
+          onDelete={nodeNotes?.get(notePanelNodeId) && onDeleteNote ? () => onDeleteNote(notePanelNodeId) : undefined}
+          onClose={onCloseNotePanel}
+        />
+      )}
+
+      {/* Side chat slide-out panel */}
+      {sideChatPanelNodeId && sideChatPanelNode && onCloseSideChat && onSendSideChat && (
+        <SideChatPanel
+          parentNode={sideChatPanelNode}
+          selectedText={sideChatSelectedText || undefined}
+          messages={sideChatMessages || []}
+          streamingContent={sideChatStreamingContent || ''}
+          isStreaming={isSideChatStreaming || false}
+          onSend={onSendSideChat}
+          onClose={onCloseSideChat}
+        />
+      )}
     </div>
   );
 }

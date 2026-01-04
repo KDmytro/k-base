@@ -42,6 +42,8 @@ class NodeType(str, enum.Enum):
     USER_NOTE = "user_note"
     BRANCH_SUMMARY = "branch_summary"
     SYSTEM = "system"
+    SIDE_CHAT_USER = "side_chat_user"
+    SIDE_CHAT_ASSISTANT = "side_chat_assistant"
 
 
 class NodeStatus(str, enum.Enum):
@@ -117,6 +119,7 @@ class Node(Base):
     content = Column(Text, nullable=False)
     node_type = Column(
         PGEnum('user_message', 'assistant_message', 'user_note', 'branch_summary', 'system',
+               'side_chat_user', 'side_chat_assistant',
                name='node_type', create_type=False),
         nullable=False
     )
@@ -140,6 +143,9 @@ class Node(Base):
     # Ordering within siblings
     sibling_index = Column(Integer, default=0, nullable=False)
     is_selected_path = Column(Boolean, default=True, nullable=False)
+
+    # For side chat nodes - stores the text selection that started the thread
+    selected_text = Column(Text, nullable=True)
 
     created_at = Column(DateTime(timezone=True), default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)

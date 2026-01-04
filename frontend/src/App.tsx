@@ -28,6 +28,20 @@ function App() {
   const [streamingContent, setStreamingContent] = useState<string>('');
   const [isStreaming, setIsStreaming] = useState(false);
 
+  // Note state
+  const [nodeNotes, setNodeNotes] = useState<Map<string, Node>>(new Map());
+  const [notePanelNodeId, setNotePanelNodeId] = useState<string | null>(null);
+
+  // Side chat state
+  const [sideChatCounts, setSideChatCounts] = useState<Map<string, number>>(new Map());
+  const [sideChatThreads, setSideChatThreads] = useState<Map<string, string[]>>(new Map()); // nodeId -> array of selected texts
+  const [sideChatPanelNodeId, setSideChatPanelNodeId] = useState<string | null>(null);
+  const [sideChatPanelNode, setSideChatPanelNode] = useState<Node | null>(null);
+  const [sideChatSelectedText, setSideChatSelectedText] = useState<string | null>(null);
+  const [sideChatMessages, setSideChatMessages] = useState<Node[]>([]);
+  const [sideChatStreamingContent, setSideChatStreamingContent] = useState<string>('');
+  const [isSideChatStreaming, setIsSideChatStreaming] = useState(false);
+
   // Load session nodes when session changes
   useEffect(() => {
     if (currentSessionId) {
@@ -35,6 +49,15 @@ function App() {
       setReplyToNode(null); // Clear any fork context when switching sessions
       setBranchSwitcherNodeId(null);
       setBranchSwitcherSiblings([]);
+      setNotePanelNodeId(null);
+      setNodeNotes(new Map());
+      // Reset side chat state
+      setSideChatPanelNodeId(null);
+      setSideChatPanelNode(null);
+      setSideChatSelectedText(null);
+      setSideChatMessages([]);
+      setSideChatCounts(new Map());
+      setSideChatThreads(new Map());
     } else {
       setNodes([]);
       setTreeNodes([]);
@@ -43,6 +66,15 @@ function App() {
       setSiblingCounts(new Map());
       setBranchSwitcherNodeId(null);
       setBranchSwitcherSiblings([]);
+      setNotePanelNodeId(null);
+      setNodeNotes(new Map());
+      // Reset side chat state
+      setSideChatPanelNodeId(null);
+      setSideChatPanelNode(null);
+      setSideChatSelectedText(null);
+      setSideChatMessages([]);
+      setSideChatCounts(new Map());
+      setSideChatThreads(new Map());
     }
   }, [currentSessionId]);
 
@@ -71,6 +103,9 @@ function App() {
   const loadFullThread = async (rootNodeId: string): Promise<Node[]> => {
     const thread: Node[] = [];
     const counts = new Map<string, number>();
+    const notes = new Map<string, Node>();
+    const sideChats = new Map<string, number>();
+    const threads = new Map<string, string[]>();
     let currentId: string | null = rootNodeId;
 
     while (currentId) {
@@ -82,9 +117,33 @@ function App() {
         const siblings = await apiClient.getNodeSiblings(currentId);
         counts.set(currentId, siblings.length);
 
-        // Get children and follow the selected path
+        // Load note for this node
+        const note = await apiClient.getNote(currentId);
+        if (note) {
+          notes.set(currentId, note);
+        }
+
+        // Load side chat threads for this node (for highlighting)
+        const nodeThreads = await apiClient.getSideChatThreads(currentId);
+        if (nodeThreads.length > 0) {
+          // Count total messages
+          const totalCount = nodeThreads.reduce((sum, t) => sum + t.count, 0);
+          sideChats.set(currentId, totalCount);
+          // Extract selected texts for highlighting (filter out null)
+          const selectedTexts = nodeThreads
+            .map((t) => t.selectedText)
+            .filter((text): text is string => text !== null);
+          if (selectedTexts.length > 0) {
+            threads.set(currentId, selectedTexts);
+          }
+        }
+
+        // Get children and follow the selected path (only main conversation nodes)
         const children = await apiClient.getNodeChildren(currentId);
-        const selectedChild = children.find((c) => c.isSelectedPath);
+        const mainConversationChildren = children.filter(
+          (c) => c.nodeType === 'user_message' || c.nodeType === 'assistant_message'
+        );
+        const selectedChild = mainConversationChildren.find((c) => c.isSelectedPath);
         currentId = selectedChild?.id || null;
       } catch {
         break;
@@ -92,6 +151,9 @@ function App() {
     }
 
     setSiblingCounts(counts);
+    setNodeNotes(notes);
+    setSideChatCounts(sideChats);
+    setSideChatThreads(threads);
     return thread;
   };
 
@@ -172,6 +234,118 @@ function App() {
       console.error('Failed to navigate tree:', err);
     }
   }, [currentSession, currentSessionId]);
+
+  // Note handlers
+  const handleOpenNotePanel = useCallback((nodeId: string) => {
+    setNotePanelNodeId(nodeId);
+  }, []);
+
+  const handleCloseNotePanel = useCallback(() => {
+    setNotePanelNodeId(null);
+  }, []);
+
+  const handleSaveNote = useCallback(async (nodeId: string, content: string) => {
+    try {
+      const note = await apiClient.addNote(nodeId, content);
+      setNodeNotes((prev) => {
+        const updated = new Map(prev);
+        updated.set(nodeId, note);
+        return updated;
+      });
+      setNotePanelNodeId(null);
+    } catch (err) {
+      console.error('Failed to save note:', err);
+    }
+  }, []);
+
+  const handleDeleteNote = useCallback(async (nodeId: string) => {
+    try {
+      await apiClient.deleteNote(nodeId);
+      setNodeNotes((prev) => {
+        const updated = new Map(prev);
+        updated.delete(nodeId);
+        return updated;
+      });
+      setNotePanelNodeId(null);
+    } catch (err) {
+      console.error('Failed to delete note:', err);
+    }
+  }, []);
+
+  // Side chat handlers
+  const handleOpenSideChat = useCallback(async (nodeId: string, selectedText?: string) => {
+    try {
+      const node = nodes.find(n => n.id === nodeId);
+      if (!node) return;
+
+      // Filter messages by selectedText to show only this thread
+      const messages = await apiClient.getSideChats(nodeId, selectedText);
+      setSideChatPanelNodeId(nodeId);
+      setSideChatPanelNode(node);
+      setSideChatSelectedText(selectedText || null);
+      setSideChatMessages(messages);
+    } catch (err) {
+      console.error('Failed to open side chat:', err);
+    }
+  }, [nodes]);
+
+  const handleCloseSideChat = useCallback(() => {
+    setSideChatPanelNodeId(null);
+    setSideChatPanelNode(null);
+    setSideChatSelectedText(null);
+    setSideChatMessages([]);
+    setSideChatStreamingContent('');
+    setIsSideChatStreaming(false);
+  }, []);
+
+  const handleSendSideChat = useCallback(async (content: string, includeMainContext: boolean) => {
+    if (!sideChatPanelNodeId) return;
+
+    setSideChatStreamingContent('');
+    setIsSideChatStreaming(true);
+
+    await apiClient.sendSideChatStream(
+      sideChatPanelNodeId,
+      content,
+      sideChatSelectedText || undefined,
+      includeMainContext,
+      {
+        onUserNode: (userNode) => {
+          setSideChatMessages((prev) => [...prev, userNode]);
+        },
+        onToken: (token) => {
+          setSideChatStreamingContent((prev) => prev + token);
+        },
+        onComplete: (assistantNode) => {
+          setIsSideChatStreaming(false);
+          setSideChatStreamingContent('');
+          setSideChatMessages((prev) => [...prev, assistantNode]);
+          // Update side chat count
+          setSideChatCounts((prev) => {
+            const updated = new Map(prev);
+            updated.set(sideChatPanelNodeId, (prev.get(sideChatPanelNodeId) || 0) + 2);
+            return updated;
+          });
+          // Update threads for highlighting if this is a new thread
+          if (sideChatSelectedText) {
+            setSideChatThreads((prev) => {
+              const updated = new Map(prev);
+              const existing = updated.get(sideChatPanelNodeId) || [];
+              if (!existing.includes(sideChatSelectedText)) {
+                updated.set(sideChatPanelNodeId, [...existing, sideChatSelectedText]);
+              }
+              return updated;
+            });
+          }
+        },
+        onError: (error) => {
+          console.error('Failed to send side chat:', error);
+          setIsSideChatStreaming(false);
+          setSideChatStreamingContent('');
+        },
+      }
+    );
+  }, [sideChatPanelNodeId, sideChatSelectedText]);
 
   const handleSendMessage = useCallback(async (message: string) => {
     if (!currentSessionId) return;
@@ -271,6 +445,25 @@ function App() {
             // Streaming props
             streamingContent={streamingContent}
             isStreaming={isStreaming}
+            // Note props
+            nodeNotes={nodeNotes}
+            notePanelNodeId={notePanelNodeId}
+            onOpenNotePanel={handleOpenNotePanel}
+            onCloseNotePanel={handleCloseNotePanel}
+            onSaveNote={handleSaveNote}
+            onDeleteNote={handleDeleteNote}
+            // Side chat props
+            sideChatCounts={sideChatCounts}
+            sideChatThreads={sideChatThreads}
+            sideChatPanelNodeId={sideChatPanelNodeId}
+            sideChatPanelNode={sideChatPanelNode}
+            sideChatSelectedText={sideChatSelectedText}
+            sideChatMessages={sideChatMessages}
+            sideChatStreamingContent={sideChatStreamingContent}
+            isSideChatStreaming={isSideChatStreaming}
+            onOpenSideChat={handleOpenSideChat}
+            onCloseSideChat={handleCloseSideChat}
+            onSendSideChat={handleSendSideChat}
           />
         ) : (
           <div className="flex items-center justify-center h-full bg-gray-50">

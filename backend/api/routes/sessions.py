@@ -8,7 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from models.database import Session, Topic, Node, get_db
+from models.database import Session, Topic, Node, NodeType, get_db
 from models.schemas import SessionCreate, SessionUpdate, SessionResponse, NodeResponse
 
 router = APIRouter(prefix="/sessions", tags=["sessions"])
@@ -92,17 +92,20 @@ async def get_session_tree(
     session_id: UUID,
     db: AsyncSession = Depends(get_db)
 ) -> List[Node]:
-    """Get the full tree of nodes for a session."""
+    """Get the conversation tree for a session (excludes notes and side chats)."""
     # Verify session exists
     result = await db.execute(select(Session).where(Session.id == session_id))
     session = result.scalar_one_or_none()
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
 
-    # Get all nodes for this session, ordered by creation time
+    # Get only main conversation nodes (user_message and assistant_message)
     result = await db.execute(
         select(Node)
-        .where(Node.session_id == session_id)
+        .where(
+            Node.session_id == session_id,
+            Node.node_type.in_([NodeType.USER_MESSAGE, NodeType.ASSISTANT_MESSAGE])
+        )
         .order_by(Node.created_at)
     )
     return list(result.scalars().all())

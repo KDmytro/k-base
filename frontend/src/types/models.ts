@@ -8,7 +8,9 @@ export type NodeType =
     | 'assistant_message'
     | 'user_note'
     | 'branch_summary'
-    | 'system';
+    | 'system'
+    | 'side_chat_user'
+    | 'side_chat_assistant';
 
 export type NodeStatus =
     | 'active'
@@ -60,6 +62,9 @@ export interface Node {
 
     siblingIndex: number;
     isSelectedPath: boolean;
+
+    // For side chat nodes - the text selection that started this thread
+    selectedText?: string;
 
     createdAt: Date;
     updatedAt: Date;
