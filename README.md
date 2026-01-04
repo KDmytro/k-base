@@ -210,15 +210,17 @@ VITE_API_URL=http://localhost:8000/api/v1
 
 The project follows a phased implementation approach:
 
-### Phase 1: Foundation ✅ (CURRENT)
+### Phase 1: Foundation ✅ (COMPLETE)
 - [x] Database setup with pgvector
 - [x] Database models and migrations
 - [x] FastAPI project structure
-- [ ] Basic CRUD for topics, sessions, nodes
-- [ ] Simple chat endpoint
-- [ ] Basic React app with single-thread chat view
+- [x] Basic CRUD for topics, sessions, nodes
+- [x] Simple chat endpoint with LLM integration (LiteLLM/GPT-4o-mini)
+- [x] Basic React app with single-thread chat view
+- [x] Sidebar for topic/session management
+- [x] API client with snake_case/camelCase conversion
 
-### Phase 2: Branching
+### Phase 2: Branching (CURRENT)
 - [ ] Tree rendering in frontend
 - [ ] Branch creation (fork from any node)
 - [ ] Branch selection UI
@@ -249,10 +251,10 @@ The project follows a phased implementation approach:
 
 ## Next Steps
 
-1. **Implement API Routes**: Create CRUD endpoints for topics, sessions, and nodes
-2. **Build Chat Service**: Implement the chat service with LLM integration
-3. **Create UI Components**: Build the chat interface and tree visualization
-4. **Add RAG System**: Implement the memory and embedding services
+1. **Tree Visualization**: Render conversation as a tree with branch indicators
+2. **Branch Creation**: Add UI to fork conversations at any node
+3. **Branch Navigation**: Implement breadcrumbs and branch selection
+4. **Streaming Responses**: Add SSE/WebSocket for real-time token streaming
 
 ## Documentation
 
@@ -264,4 +266,4 @@ This project is in active development.
 
 ---
 
-*Last Updated: 2026-01-02*
+*Last Updated: 2026-01-03*
