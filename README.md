@@ -220,10 +220,10 @@ The project follows a phased implementation approach:
 - [x] Sidebar for topic/session management
 - [x] API client with snake_case/camelCase conversion
 
-### Phase 2: Branching (CURRENT)
-- [ ] Tree rendering in frontend
-- [ ] Branch creation (fork from any node)
-- [ ] Branch selection UI
+### Phase 2: Branching (IN PROGRESS)
+- [x] Branch creation (fork from any node)
+- [x] Branch selection UI (indicator + dropdown switcher)
+- [ ] Tree rendering in frontend (visual tree view)
 - [ ] Breadcrumb navigation
 - [ ] Regenerate response
 - [ ] Streaming responses via WebSocket
@@ -251,9 +251,9 @@ The project follows a phased implementation approach:
 
 ## Next Steps
 
-1. **Tree Visualization**: Render conversation as a tree with branch indicators
-2. **Branch Creation**: Add UI to fork conversations at any node
-3. **Branch Navigation**: Implement breadcrumbs and branch selection
+1. **Tree Visualization**: Render conversation as a visual tree structure
+2. **Breadcrumb Navigation**: Show current path in the conversation tree
+3. **Regenerate Response**: Allow regenerating AI responses (creates sibling branch)
 4. **Streaming Responses**: Add SSE/WebSocket for real-time token streaming
 
 ## Documentation
