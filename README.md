@@ -5,14 +5,16 @@ K-Base is a brainstorming and learning application that treats conversations as 
 ## Features
 
 - **Branching Conversations**: Fork conversations at any point without losing the main thread
-- **Collapsible Branches**: Hide tangent details while preserving their summaries
-- **Shared Memory**: Related sessions share context via RAG (Retrieval-Augmented Generation)
-- **Tree Navigation**: Navigate complex discussion trees with ease
-- **Multi-Provider LLM Support**: Ready for multiple LLM providers (starting with OpenAI)
+- **Inline Branch Switching**: Non-active branches appear as collapsed preview cards at fork points
+- **Side Chat Threads**: Select any text in a message to start a focused side conversation
+- **User Notes**: Add notes to any message for annotations and reminders
+- **Tree Navigation**: Navigate complex discussion trees with mini tree visualization
+- **Streaming Responses**: Real-time token streaming with markdown rendering
+- **Multi-Provider LLM Support**: Ready for multiple LLM providers (via LiteLLM)
 
 ## Architecture
 
-- **Frontend**: React 18 + TypeScript + Vite + Tailwind CSS + Zustand
+- **Frontend**: React 18 + TypeScript + Vite + Tailwind CSS
 - **Backend**: FastAPI (Python 3.11+) with async support
 - **Database**: PostgreSQL 15+ with pgvector extension
 - **LLM Gateway**: LiteLLM for provider abstraction
@@ -229,11 +231,15 @@ The project follows a phased implementation approach:
 - [x] Session renaming (double-click or pencil icon)
 - [x] URL routing (`/topic/:id/session/:id` for deep linking)
 
-### Phase 3: Collapse & Notes
-- [ ] Collapse branch functionality
-- [ ] Summary generation for collapsed branches
-- [ ] User notes (add note to any node)
-- [ ] Notes display in tree
+### Phase 3: Notes & Side Chats ✅ (COMPLETE)
+- [x] User notes (add note to any node with slide-out panel)
+- [x] Inline note display below messages
+- [x] Side chat threads (select text to start focused discussion)
+- [x] Multiple side chat threads per message (different selections)
+- [x] Text highlighting for existing side chat threads
+- [x] Cross-element highlighting (selections spanning markdown elements)
+- [x] Thread isolation (separate LLM context per selection)
+- [x] Inline collapsed branches (replaced dropdown with preview cards)
 
 ### Phase 4: RAG Integration
 - [ ] Embedding service integration
@@ -252,10 +258,10 @@ The project follows a phased implementation approach:
 
 ## Next Steps
 
-1. **Collapse Branches**: Hide tangent details with AI-generated summaries
-2. **User Notes**: Add notes to any node in the conversation
+1. **RAG Integration**: Shared memory across sessions via embeddings
+2. **Collapse Branches**: Hide tangent details with AI-generated summaries
 3. **Regenerate Response**: Re-roll AI responses (creates sibling branch)
-4. **RAG Integration**: Shared memory across sessions via embeddings
+4. **Export to Markdown**: Export conversation threads to markdown files
 
 ## Documentation
 
@@ -267,4 +273,4 @@ This project is in active development.
 
 ---
 
-*Last Updated: 2026-01-03*
+*Last Updated: 2026-01-04*
