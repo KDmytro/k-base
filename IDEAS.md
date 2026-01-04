@@ -77,6 +77,40 @@ Interactive components that can be added to topics:
 
 ---
 
+## Observability & Quality
+
+### Tracing
+- [ ] LLM call tracing (inputs, outputs, latency, tokens)
+- [ ] Request tracing across frontend/backend
+- [ ] OpenTelemetry integration
+- [ ] Trace visualization dashboard
+- [ ] Cost tracking per topic/session
+
+### Logging
+- [ ] Structured logging (JSON)
+- [ ] Log aggregation (Loki, CloudWatch, etc.)
+- [ ] Error tracking (Sentry integration)
+- [ ] User action audit logs
+- [ ] Debug mode for development
+
+### Evals & Quality
+- [ ] Response quality scoring
+- [ ] User feedback collection (thumbs up/down)
+- [ ] A/B testing different prompts/models
+- [ ] Automated eval pipelines
+- [ ] Regression testing for prompt changes
+- [ ] Hallucination detection
+- [ ] Response latency benchmarks
+
+### Monitoring
+- [ ] Health check endpoints
+- [ ] Metrics dashboard (Grafana)
+- [ ] Alerting on errors/latency
+- [ ] Token usage monitoring
+- [ ] Rate limit tracking
+
+---
+
 ## Technical Debt / Improvements
 
 - [ ] Offline support (PWA)
