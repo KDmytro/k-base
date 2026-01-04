@@ -159,6 +159,16 @@ class ApiClient {
     return this.request<Node[]>(`/nodes/${id}/children`);
   }
 
+  async getNodeSiblings(id: string): Promise<Node[]> {
+    return this.request<Node[]>(`/nodes/${id}/siblings`);
+  }
+
+  async selectBranch(nodeId: string): Promise<Node> {
+    return this.request<Node>(`/nodes/${nodeId}/select`, {
+      method: 'POST',
+    });
+  }
+
   // Chat
   async sendMessage(request: ChatRequest): Promise<ChatResponse> {
     return this.request<ChatResponse>('/chat', {

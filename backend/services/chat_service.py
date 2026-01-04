@@ -125,6 +125,7 @@ more informed and consistent responses, but don't explicitly reference
         """Create a user message node."""
         # Calculate sibling index if branching
         sibling_index = 0
+        siblings = []
         if parent_id:
             result = await db.execute(
                 select(Node).where(Node.parent_id == parent_id)
@@ -132,12 +133,18 @@ more informed and consistent responses, but don't explicitly reference
             siblings = result.scalars().all()
             sibling_index = len(siblings)
 
+            # If branching (creating a sibling), mark existing siblings as not selected
+            if sibling_index > 0:
+                for sibling in siblings:
+                    sibling.is_selected_path = False
+
         node = Node(
             session_id=session_id,
             parent_id=parent_id,
             content=content,
             node_type='user_message',
-            sibling_index=sibling_index
+            sibling_index=sibling_index,
+            is_selected_path=True  # New branch is always selected
         )
         db.add(node)
         await db.flush()
@@ -169,6 +176,7 @@ more informed and consistent responses, but don't explicitly reference
             parent_id=parent_id,
             content=content,
             node_type='assistant_message',
+            is_selected_path=True,  # Assistant response is part of selected path
             generation_config=generation_config or {
                 "provider": "openai",
                 "model": self.default_model,

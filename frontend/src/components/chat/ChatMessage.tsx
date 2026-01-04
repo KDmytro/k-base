@@ -1,17 +1,21 @@
-import { User, Bot } from 'lucide-react';
+import { User, Bot, GitBranch } from 'lucide-react';
 import type { Node } from '@/types/models';
 
 interface ChatMessageProps {
   node: Node;
+  siblingCount?: number;
+  onFork?: (nodeId: string) => void;
+  onShowBranches?: (nodeId: string) => void;
 }
 
-export function ChatMessage({ node }: ChatMessageProps) {
+export function ChatMessage({ node, siblingCount = 1, onFork, onShowBranches }: ChatMessageProps) {
   const isUser = node.nodeType === 'user_message';
   const isNote = node.nodeType === 'user_note';
+  const hasBranches = siblingCount > 1;
 
   return (
     <div
-      className={`flex gap-3 p-4 ${
+      className={`group relative flex gap-3 p-4 ${
         isUser ? 'bg-white' : 'bg-gray-50'
       } ${isNote ? 'border-l-4 border-yellow-400 bg-yellow-50' : ''}`}
     >
@@ -30,6 +34,34 @@ export function ChatMessage({ node }: ChatMessageProps) {
         <div className="text-gray-900 whitespace-pre-wrap break-words">
           {node.content}
         </div>
+      </div>
+
+      {/* Action buttons container - top right */}
+      <div className="absolute top-2 right-2 flex items-center gap-1">
+        {/* Branch indicator - always visible when has branches */}
+        {hasBranches && onShowBranches && (
+          <button
+            onClick={() => onShowBranches(node.id)}
+            className="relative p-1.5 rounded-md bg-purple-100 text-purple-600 hover:bg-purple-200 hover:text-purple-700 transition-colors"
+            title={`${siblingCount} branches - click to switch`}
+          >
+            <GitBranch size={16} />
+            <span className="absolute -top-1 -right-1 bg-purple-600 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-medium">
+              {siblingCount}
+            </span>
+          </button>
+        )}
+
+        {/* Fork button - appears on hover */}
+        {onFork && (
+          <button
+            onClick={() => onFork(node.id)}
+            className="p-1.5 rounded-md bg-gray-100 text-gray-500 opacity-0 group-hover:opacity-100 hover:bg-gray-200 hover:text-gray-700 transition-opacity"
+            title="Fork conversation from here"
+          >
+            <GitBranch size={16} />
+          </button>
+        )}
       </div>
     </div>
   );

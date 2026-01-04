@@ -65,6 +65,55 @@ async def get_node_children(
     return list(result.scalars().all())
 
 
+@router.get("/{node_id}/siblings", response_model=List[NodeResponse])
+async def get_node_siblings(
+    node_id: UUID,
+    db: AsyncSession = Depends(get_db)
+) -> List[Node]:
+    """Get all siblings of a node (nodes with the same parent)."""
+    result = await db.execute(select(Node).where(Node.id == node_id))
+    node = result.scalar_one_or_none()
+    if not node:
+        raise HTTPException(status_code=404, detail="Node not found")
+
+    if not node.parent_id:
+        # Root node has no siblings
+        return [node]
+
+    result = await db.execute(
+        select(Node)
+        .where(Node.parent_id == node.parent_id)
+        .order_by(Node.sibling_index, Node.created_at)
+    )
+    return list(result.scalars().all())
+
+
+@router.post("/{node_id}/select", response_model=NodeResponse)
+async def select_branch(
+    node_id: UUID,
+    db: AsyncSession = Depends(get_db)
+) -> Node:
+    """Select this node as the active branch (marks siblings as not selected)."""
+    result = await db.execute(select(Node).where(Node.id == node_id))
+    node = result.scalar_one_or_none()
+    if not node:
+        raise HTTPException(status_code=404, detail="Node not found")
+
+    if node.parent_id:
+        # Mark all siblings as not selected
+        result = await db.execute(
+            select(Node).where(Node.parent_id == node.parent_id)
+        )
+        siblings = result.scalars().all()
+        for sibling in siblings:
+            sibling.is_selected_path = (sibling.id == node_id)
+
+    node.is_selected_path = True
+    await db.flush()
+    await db.refresh(node)
+    return node
+
+
 @router.patch("/{node_id}", response_model=NodeResponse)
 async def update_node(
     node_id: UUID,

@@ -1,16 +1,41 @@
 import { useEffect, useRef } from 'react';
 import { ChatMessage } from './ChatMessage';
 import { ChatInput } from './ChatInput';
+import { BranchSwitcher } from './BranchSwitcher';
 import type { Node } from '@/types/models';
 
 interface ChatThreadProps {
   nodes: Node[];
   isLoading: boolean;
   onSendMessage: (message: string) => void;
+  onForkNode?: (nodeId: string) => void;
+  replyToNode?: Node | null;
+  onClearReply?: () => void;
   sessionName?: string;
+  // Branch switching props
+  siblingCounts?: Map<string, number>;
+  onShowBranches?: (nodeId: string) => void;
+  branchSwitcherNodeId?: string | null;
+  branchSwitcherSiblings?: Node[];
+  onSelectBranch?: (nodeId: string) => void;
+  onCloseBranchSwitcher?: () => void;
 }
 
-export function ChatThread({ nodes, isLoading, onSendMessage, sessionName }: ChatThreadProps) {
+export function ChatThread({
+  nodes,
+  isLoading,
+  onSendMessage,
+  onForkNode,
+  replyToNode,
+  onClearReply,
+  sessionName,
+  siblingCounts,
+  onShowBranches,
+  branchSwitcherNodeId,
+  branchSwitcherSiblings,
+  onSelectBranch,
+  onCloseBranchSwitcher,
+}: ChatThreadProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -38,7 +63,23 @@ export function ChatThread({ nodes, isLoading, onSendMessage, sessionName }: Cha
         ) : (
           <div className="divide-y">
             {nodes.map((node) => (
-              <ChatMessage key={node.id} node={node} />
+              <div key={node.id} className="relative">
+                <ChatMessage
+                  node={node}
+                  siblingCount={siblingCounts?.get(node.id) ?? 1}
+                  onFork={onForkNode}
+                  onShowBranches={onShowBranches}
+                />
+                {/* Branch switcher dropdown */}
+                {branchSwitcherNodeId === node.id && branchSwitcherSiblings && onSelectBranch && onCloseBranchSwitcher && (
+                  <BranchSwitcher
+                    siblings={branchSwitcherSiblings}
+                    currentNodeId={node.id}
+                    onSelect={onSelectBranch}
+                    onClose={onCloseBranchSwitcher}
+                  />
+                )}
+              </div>
             ))}
             {isLoading && (
               <div className="flex gap-3 p-4 bg-gray-50">
@@ -61,6 +102,8 @@ export function ChatThread({ nodes, isLoading, onSendMessage, sessionName }: Cha
         onSend={onSendMessage}
         disabled={isLoading}
         placeholder={nodes.length === 0 ? 'Start a conversation...' : 'Continue the conversation...'}
+        replyToNode={replyToNode}
+        onClearReply={onClearReply}
       />
     </div>
   );
