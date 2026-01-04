@@ -32,10 +32,13 @@ function App() {
 
   // Side chat state
   const [sideChatCounts, setSideChatCounts] = useState<Map<string, number>>(new Map());
-  const [sideChatThreads, setSideChatThreads] = useState<Map<string, string[]>>(new Map()); // nodeId -> array of selected texts
+  // Position-based highlighting: nodeId -> array of { start, end, text } for each thread
+  const [sideChatThreads, setSideChatThreads] = useState<Map<string, { start: number; end: number; text: string }[]>>(new Map());
   const [sideChatPanelNodeId, setSideChatPanelNodeId] = useState<string | null>(null);
   const [sideChatPanelNode, setSideChatPanelNode] = useState<Node | null>(null);
   const [sideChatSelectedText, setSideChatSelectedText] = useState<string | null>(null);
+  const [sideChatSelectionStart, setSideChatSelectionStart] = useState<number | null>(null);
+  const [sideChatSelectionEnd, setSideChatSelectionEnd] = useState<number | null>(null);
   const [sideChatMessages, setSideChatMessages] = useState<Node[]>([]);
   const [sideChatStreamingContent, setSideChatStreamingContent] = useState<string>('');
   const [isSideChatStreaming, setIsSideChatStreaming] = useState(false);
@@ -52,6 +55,8 @@ function App() {
       setSideChatPanelNodeId(null);
       setSideChatPanelNode(null);
       setSideChatSelectedText(null);
+      setSideChatSelectionStart(null);
+      setSideChatSelectionEnd(null);
       setSideChatMessages([]);
       setSideChatCounts(new Map());
       setSideChatThreads(new Map());
@@ -67,6 +72,8 @@ function App() {
       setSideChatPanelNodeId(null);
       setSideChatPanelNode(null);
       setSideChatSelectedText(null);
+      setSideChatSelectionStart(null);
+      setSideChatSelectionEnd(null);
       setSideChatMessages([]);
       setSideChatCounts(new Map());
       setSideChatThreads(new Map());
@@ -100,7 +107,7 @@ function App() {
     const forkPoints = new Map<string, Node[]>();
     const notes = new Map<string, Node>();
     const sideChats = new Map<string, number>();
-    const threads = new Map<string, string[]>();
+    const threads = new Map<string, { start: number; end: number; text: string }[]>();
     let currentId: string | null = rootNodeId;
 
     while (currentId) {
@@ -120,12 +127,17 @@ function App() {
           // Count total messages
           const totalCount = nodeThreads.reduce((sum, t) => sum + t.count, 0);
           sideChats.set(currentId, totalCount);
-          // Extract selected texts for highlighting (filter out null)
-          const selectedTexts = nodeThreads
-            .map((t) => t.selectedText)
-            .filter((text): text is string => text !== null);
-          if (selectedTexts.length > 0) {
-            threads.set(currentId, selectedTexts);
+          // Extract ranges for highlighting - use positions if available, otherwise use text
+          const positionRanges = nodeThreads
+            .filter((t) => t.selectedText !== null)
+            .map((t) => ({
+              // Use actual positions if available, otherwise use -1 to indicate text-only matching
+              start: t.selectionStart ?? -1,
+              end: t.selectionEnd ?? -1,
+              text: t.selectedText as string
+            }));
+          if (positionRanges.length > 0) {
+            threads.set(currentId, positionRanges);
           }
         }
 
@@ -251,7 +263,12 @@ function App() {
   }, []);
 
   // Side chat handlers
-  const handleOpenSideChat = useCallback(async (nodeId: string, selectedText?: string) => {
+  const handleOpenSideChat = useCallback(async (
+    nodeId: string,
+    selectedText?: string,
+    selectionStart?: number,
+    selectionEnd?: number
+  ) => {
     try {
       const node = nodes.find(n => n.id === nodeId);
       if (!node) return;
@@ -261,6 +278,8 @@ function App() {
       setSideChatPanelNodeId(nodeId);
       setSideChatPanelNode(node);
       setSideChatSelectedText(selectedText || null);
+      setSideChatSelectionStart(selectionStart ?? null);
+      setSideChatSelectionEnd(selectionEnd ?? null);
       setSideChatMessages(messages);
     } catch (err) {
       console.error('Failed to open side chat:', err);
@@ -271,6 +290,8 @@ function App() {
     setSideChatPanelNodeId(null);
     setSideChatPanelNode(null);
     setSideChatSelectedText(null);
+    setSideChatSelectionStart(null);
+    setSideChatSelectionEnd(null);
     setSideChatMessages([]);
     setSideChatStreamingContent('');
     setIsSideChatStreaming(false);
@@ -286,6 +307,8 @@ function App() {
       sideChatPanelNodeId,
       content,
       sideChatSelectedText || undefined,
+      sideChatSelectionStart ?? undefined,
+      sideChatSelectionEnd ?? undefined,
       includeMainContext,
       {
         onUserNode: (userNode) => {
@@ -304,13 +327,20 @@ function App() {
             updated.set(sideChatPanelNodeId, (prev.get(sideChatPanelNodeId) || 0) + 2);
             return updated;
           });
-          // Update threads for highlighting if this is a new thread
-          if (sideChatSelectedText) {
+          // Update threads for highlighting if this is a new thread with positions
+          if (sideChatSelectedText && sideChatSelectionStart !== null && sideChatSelectionEnd !== null) {
             setSideChatThreads((prev) => {
               const updated = new Map(prev);
               const existing = updated.get(sideChatPanelNodeId) || [];
-              if (!existing.includes(sideChatSelectedText)) {
-                updated.set(sideChatPanelNodeId, [...existing, sideChatSelectedText]);
+              // Check if this range already exists
+              const alreadyExists = existing.some(
+                (r) => r.start === sideChatSelectionStart && r.end === sideChatSelectionEnd
+              );
+              if (!alreadyExists) {
+                updated.set(sideChatPanelNodeId, [
+                  ...existing,
+                  { start: sideChatSelectionStart, end: sideChatSelectionEnd, text: sideChatSelectedText }
+                ]);
               }
               return updated;
             });
@@ -323,7 +353,7 @@ function App() {
         },
       }
     );
-  }, [sideChatPanelNodeId, sideChatSelectedText]);
+  }, [sideChatPanelNodeId, sideChatSelectedText, sideChatSelectionStart, sideChatSelectionEnd]);
 
   const handleSendMessage = useCallback(async (message: string) => {
     if (!currentSessionId) return;

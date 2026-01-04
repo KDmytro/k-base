@@ -159,15 +159,23 @@ async def send_side_chat_stream(
     # Get the main conversation path up to the parent node
     main_path = await chat_service.get_conversation_path(db, request.parent_node_id)
 
-    # Get existing side chat history
-    result = await db.execute(
+    # Get existing side chat history for THIS SPECIFIC thread (filtered by selected_text)
+    # This ensures different selections on the same parent node have separate conversations
+    side_chat_query = (
         select(Node)
         .where(
             Node.parent_id == request.parent_node_id,
             Node.node_type.in_([NodeType.SIDE_CHAT_USER, NodeType.SIDE_CHAT_ASSISTANT])
         )
-        .order_by(Node.created_at)
     )
+    # Filter by selected_text to isolate this thread
+    if request.selected_text is not None:
+        side_chat_query = side_chat_query.where(Node.selected_text == request.selected_text)
+    else:
+        side_chat_query = side_chat_query.where(Node.selected_text.is_(None))
+
+    side_chat_query = side_chat_query.order_by(Node.created_at)
+    result = await db.execute(side_chat_query)
     side_chat_history = list(result.scalars().all())
 
     # Create user side chat node
@@ -177,7 +185,9 @@ async def send_side_chat_stream(
         parent_id=request.parent_node_id,
         content=request.content,
         node_type='side_chat_user',
-        selected_text=request.selected_text  # Store the text that started this thread
+        selected_text=request.selected_text,  # Store the text that started this thread
+        selection_start=request.selection_start,
+        selection_end=request.selection_end
     )
     await db.commit()
 
@@ -192,6 +202,8 @@ async def send_side_chat_stream(
     user_node_id = user_node.id
     parent_node_id = request.parent_node_id
     selected_text = request.selected_text  # Capture for assistant node
+    selection_start = request.selection_start
+    selection_end = request.selection_end
     user_node_response = NodeResponse.model_validate(user_node).model_dump(mode='json')
 
     async def stream_response():
@@ -214,7 +226,9 @@ async def send_side_chat_stream(
                     parent_id=parent_node_id,  # Side chat assistant is also child of parent node
                     content=full_response,
                     node_type='side_chat_assistant',
-                    selected_text=selected_text  # Store the same text as the user node
+                    selected_text=selected_text,  # Store the same text as the user node
+                    selection_start=selection_start,
+                    selection_end=selection_end
                 )
                 await stream_db.commit()
 

@@ -30,14 +30,14 @@ interface ChatThreadProps {
   onDeleteNote?: (nodeId: string) => void;
   // Side chat props
   sideChatCounts?: Map<string, number>;
-  sideChatThreads?: Map<string, string[]>;  // nodeId -> array of selected texts for highlighting
+  sideChatThreads?: Map<string, { start: number; end: number; text: string }[]>;  // nodeId -> array of position ranges for highlighting
   sideChatPanelNodeId?: string | null;
   sideChatPanelNode?: Node | null;
   sideChatSelectedText?: string | null;
   sideChatMessages?: Node[];
   sideChatStreamingContent?: string;
   isSideChatStreaming?: boolean;
-  onOpenSideChat?: (nodeId: string, selectedText?: string) => void;
+  onOpenSideChat?: (nodeId: string, selectedText?: string, selectionStart?: number, selectionEnd?: number) => void;
   onCloseSideChat?: () => void;
   onSendSideChat?: (content: string, includeMainContext: boolean) => void;
 }
@@ -114,7 +114,7 @@ export function ChatThread({
                     note={note}
                     onNote={onOpenNotePanel}
                     sideChatCount={sideChatCounts?.get(node.id) ?? 0}
-                    highlightedTexts={sideChatThreads?.get(node.id)}
+                    highlightRanges={sideChatThreads?.get(node.id)}
                     onSideChat={onOpenSideChat}
                   />
 

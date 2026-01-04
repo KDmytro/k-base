@@ -274,16 +274,22 @@ async def get_side_chat_threads(
 ):
     """Get unique selected_text values that have side chats for a node.
 
-    Returns a list of threads, each with the selected_text and message count.
+    Returns a list of threads, each with selected_text, positions, and message count.
     """
     # Verify parent node exists
     result = await db.execute(select(Node).where(Node.id == node_id))
     if not result.scalar_one_or_none():
         raise HTTPException(status_code=404, detail="Node not found")
 
-    # Get unique selected_text values with counts
+    # Get unique threads with selected_text, positions, and counts
+    # We use MIN to get the first occurrence's positions (they should all be the same for a thread)
     result = await db.execute(
-        select(Node.selected_text, func.count(Node.id).label('message_count'))
+        select(
+            Node.selected_text,
+            func.min(Node.selection_start).label('selection_start'),
+            func.min(Node.selection_end).label('selection_end'),
+            func.count(Node.id).label('message_count')
+        )
         .where(
             Node.parent_id == node_id,
             Node.node_type.in_([NodeType.SIDE_CHAT_USER, NodeType.SIDE_CHAT_ASSISTANT])
@@ -292,7 +298,15 @@ async def get_side_chat_threads(
         .order_by(func.min(Node.created_at))  # Order by first message in thread
     )
     rows = result.all()
-    return [{"selected_text": row.selected_text, "count": row.message_count} for row in rows]
+    return [
+        {
+            "selectedText": row.selected_text,
+            "selectionStart": row.selection_start,
+            "selectionEnd": row.selection_end,
+            "count": row.message_count
+        }
+        for row in rows
+    ]
 
 
 @router.get("/{node_id}/side-chats", response_model=List[NodeResponse])

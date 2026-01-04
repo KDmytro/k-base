@@ -14,11 +14,11 @@ interface ChatMessageProps {
   note?: Node | null;
   onNote?: (nodeId: string) => void;
   sideChatCount?: number;
-  highlightedTexts?: string[];  // Texts that have side chat threads
-  onSideChat?: (nodeId: string, selectedText?: string) => void;
+  highlightRanges?: { start: number; end: number; text: string }[];  // Position-based ranges for highlighting
+  onSideChat?: (nodeId: string, selectedText?: string, selectionStart?: number, selectionEnd?: number) => void;
 }
 
-export function ChatMessage({ node, isForkPoint = false, forkBranchCount = 0, onFork, note, onNote, sideChatCount = 0, highlightedTexts, onSideChat }: ChatMessageProps) {
+export function ChatMessage({ node, isForkPoint = false, forkBranchCount = 0, onFork, note, onNote, sideChatCount = 0, highlightRanges, onSideChat }: ChatMessageProps) {
   const isUser = node.nodeType === 'user_message';
   const isNote = node.nodeType === 'user_note';
   const hasNote = !!note;
@@ -26,6 +26,8 @@ export function ChatMessage({ node, isForkPoint = false, forkBranchCount = 0, on
 
   // Text selection state
   const [selectedText, setSelectedText] = useState<string>('');
+  const [selectionStart, setSelectionStart] = useState<number | null>(null);
+  const [selectionEnd, setSelectionEnd] = useState<number | null>(null);
   const [selectionPosition, setSelectionPosition] = useState<{ top: number; left: number } | null>(null);
   const contentRef = useRef<HTMLDivElement>(null);
 
@@ -44,6 +46,29 @@ export function ChatMessage({ node, isForkPoint = false, forkBranchCount = 0, on
           top: rect.bottom + window.scrollY + 4,
           left: rect.left + window.scrollX,
         });
+
+        // Calculate character positions in node.content (raw markdown)
+        // Find the selected text in the raw content
+        const rawContent = node.content;
+        const startPos = rawContent.indexOf(text);
+        if (startPos !== -1) {
+          setSelectionStart(startPos);
+          setSelectionEnd(startPos + text.length);
+        } else {
+          // If exact match not found, try normalizing (remove extra whitespace)
+          const normalizedText = text.replace(/\s+/g, ' ');
+          const normalizedContent = rawContent.replace(/\s+/g, ' ');
+          const normalizedStart = normalizedContent.indexOf(normalizedText);
+          if (normalizedStart !== -1) {
+            // Map back to original positions approximately
+            setSelectionStart(normalizedStart);
+            setSelectionEnd(normalizedStart + normalizedText.length);
+          } else {
+            // Can't find - just store null
+            setSelectionStart(null);
+            setSelectionEnd(null);
+          }
+        }
       }
     }
   };
@@ -55,6 +80,8 @@ export function ChatMessage({ node, isForkPoint = false, forkBranchCount = 0, on
       // Don't clear if clicking the floating button
       if (!target.closest('.selection-chat-button')) {
         setSelectedText('');
+        setSelectionStart(null);
+        setSelectionEnd(null);
         setSelectionPosition(null);
       }
     };
@@ -64,14 +91,16 @@ export function ChatMessage({ node, isForkPoint = false, forkBranchCount = 0, on
   }, []);
 
   const handleFloatingButtonClick = () => {
-    onSideChat?.(node.id, selectedText);
+    onSideChat?.(node.id, selectedText, selectionStart ?? undefined, selectionEnd ?? undefined);
     setSelectedText('');
+    setSelectionStart(null);
+    setSelectionEnd(null);
     setSelectionPosition(null);
   };
 
   // Handle clicking on highlighted text to open that thread
-  const handleHighlightClick = (text: string) => {
-    onSideChat?.(node.id, text);
+  const handleHighlightClick = (range: { start: number; end: number; text: string }) => {
+    onSideChat?.(node.id, range.text, range.start, range.end);
   };
 
   // Helper to extract text content from React nodes
@@ -88,20 +117,39 @@ export function ChatMessage({ node, isForkPoint = false, forkBranchCount = 0, on
   };
 
   // Render text with highlights for existing side chat threads (single text node)
+  // Uses position-based ranges from highlightRanges
+  // Handles both: 1) selected text within this text, 2) this text within selected text (cross-element)
   const renderTextWithHighlights = (text: string): React.ReactNode => {
-    if (!highlightedTexts || highlightedTexts.length === 0) {
+    if (!highlightRanges || highlightRanges.length === 0) {
       return text;
     }
 
-    // Find all matches and their positions
-    const matches: { start: number; end: number; text: string }[] = [];
-    for (const highlight of highlightedTexts) {
+    // Normalize text for comparison (collapse whitespace)
+    const normalizeText = (t: string) => t.replace(/\s+/g, ' ').trim();
+    const normalizedText = normalizeText(text);
+
+    // Find all matches in this text segment using the range's text field
+    const matches: { start: number; end: number; range: { start: number; end: number; text: string } }[] = [];
+
+    for (const range of highlightRanges) {
+      const normalizedRangeText = normalizeText(range.text);
+
+      // Case 1: The selected text is found within this text node
       let searchIndex = 0;
       while (searchIndex < text.length) {
-        const index = text.indexOf(highlight, searchIndex);
+        const index = text.indexOf(range.text, searchIndex);
         if (index === -1) break;
-        matches.push({ start: index, end: index + highlight.length, text: highlight });
-        searchIndex = index + highlight.length;
+        matches.push({ start: index, end: index + range.text.length, range });
+        searchIndex = index + range.text.length;
+      }
+
+      // Case 2: This text node's content is found within the selected text (cross-element selection)
+      // This handles when a multi-line selection spans multiple rendered elements
+      if (matches.length === 0 && normalizedText.length >= 10) {  // Only for substantial text
+        if (normalizedRangeText.includes(normalizedText)) {
+          // The entire text node is part of the selection - highlight all of it
+          matches.push({ start: 0, end: text.length, range });
+        }
       }
     }
 
@@ -124,18 +172,19 @@ export function ChatMessage({ node, isForkPoint = false, forkBranchCount = 0, on
       if (match.start > lastEnd) {
         result.push(text.slice(lastEnd, match.start));
       }
-      // Add highlighted text
+      // Add highlighted text (show actual text content, not the full range text)
+      const highlightedText = text.slice(match.start, match.end);
       result.push(
         <span
           key={i}
           onClick={(e) => {
             e.stopPropagation();
-            handleHighlightClick(match.text);
+            handleHighlightClick(match.range);
           }}
           className="side-chat-highlight bg-blue-100/60 border-b-2 border-blue-400 cursor-pointer hover:bg-blue-200/80 transition-colors"
           title="Click to open side chat thread"
         >
-          {match.text}
+          {highlightedText}
           <MessageCircle size={12} className="inline-block ml-0.5 mb-1 text-blue-500" />
         </span>
       );
@@ -149,23 +198,37 @@ export function ChatMessage({ node, isForkPoint = false, forkBranchCount = 0, on
   };
 
   // Process children with cross-element highlight support
+  // Uses position-based ranges from highlightRanges
   const processChildrenWithHighlights = (children: React.ReactNode): React.ReactNode => {
-    if (!highlightedTexts || highlightedTexts.length === 0) {
+    if (!highlightRanges || highlightRanges.length === 0) {
       return children;
     }
 
     // First, extract full text to check for matches
     const fullText = extractText(children);
+    const normalizeText = (t: string) => t.replace(/\s+/g, ' ').trim();
+    const normalizedFullText = normalizeText(fullText);
 
-    // Find matches in the full text
-    const matches: { start: number; end: number; text: string }[] = [];
-    for (const highlight of highlightedTexts) {
+    // Find matches in the full text using range's text field
+    const matches: { start: number; end: number; range: { start: number; end: number; text: string } }[] = [];
+    for (const range of highlightRanges) {
+      const normalizedRangeText = normalizeText(range.text);
+
+      // Case 1: The selected text is found within this element's text
       let searchIndex = 0;
       while (searchIndex < fullText.length) {
-        const index = fullText.indexOf(highlight, searchIndex);
+        const index = fullText.indexOf(range.text, searchIndex);
         if (index === -1) break;
-        matches.push({ start: index, end: index + highlight.length, text: highlight });
-        searchIndex = index + highlight.length;
+        matches.push({ start: index, end: index + range.text.length, range });
+        searchIndex = index + range.text.length;
+      }
+
+      // Case 2: This element's text is part of the selected text (cross-element)
+      if (matches.length === 0 && normalizedFullText.length >= 10) {
+        if (normalizedRangeText.includes(normalizedFullText)) {
+          // The entire element's text is part of the selection
+          matches.push({ start: 0, end: fullText.length, range });
+        }
       }
     }
 
@@ -196,7 +259,7 @@ export function ChatMessage({ node, isForkPoint = false, forkBranchCount = 0, on
       const pos = childPositions[idx];
 
       // Check if this child overlaps with any highlight
-      let overlappingMatch: { start: number; end: number; text: string } | null = null;
+      let overlappingMatch: { start: number; end: number; range: { start: number; end: number; text: string } } | null = null;
       for (const match of nonOverlapping) {
         // Check for overlap
         if (pos.start < match.end && pos.end > match.start) {
@@ -213,7 +276,7 @@ export function ChatMessage({ node, isForkPoint = false, forkBranchCount = 0, on
               key={idx}
               onClick={(e) => {
                 e.stopPropagation();
-                handleHighlightClick(overlappingMatch!.text);
+                handleHighlightClick(overlappingMatch!.range);
               }}
               className="side-chat-highlight bg-blue-100/60 border-b-2 border-blue-400 cursor-pointer hover:bg-blue-200/80 transition-colors"
               title="Click to open side chat thread"
@@ -235,7 +298,7 @@ export function ChatMessage({ node, isForkPoint = false, forkBranchCount = 0, on
               key={idx}
               onClick={(e) => {
                 e.stopPropagation();
-                handleHighlightClick(overlappingMatch!.text);
+                handleHighlightClick(overlappingMatch!.range);
               }}
               className="side-chat-highlight bg-blue-100/60 border-b-2 border-blue-400 cursor-pointer hover:bg-blue-200/80 transition-colors"
               title="Click to open side chat thread"
@@ -349,13 +412,14 @@ export function ChatMessage({ node, isForkPoint = false, forkBranchCount = 0, on
         {onSideChat && !isNote && (
           <button
             onClick={() => {
-              // If user has selected text, use that
+              // If user has selected text, use that with positions
               if (selectedText) {
-                onSideChat(node.id, selectedText);
+                onSideChat(node.id, selectedText, selectionStart ?? undefined, selectionEnd ?? undefined);
               }
               // If there are existing highlighted threads, use the first one
-              else if (highlightedTexts && highlightedTexts.length > 0) {
-                onSideChat(node.id, highlightedTexts[0]);
+              else if (highlightRanges && highlightRanges.length > 0) {
+                const firstRange = highlightRanges[0];
+                onSideChat(node.id, firstRange.text, firstRange.start, firstRange.end);
               }
               // Otherwise, start a general side chat (no selected text)
               else {

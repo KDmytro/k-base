@@ -118,6 +118,8 @@ class NodeResponse(BaseModel):
     sibling_index: int
     is_selected_path: bool
     selected_text: Optional[str] = None  # For side chat nodes - the text that started this thread
+    selection_start: Optional[int] = None  # Start position for highlighting
+    selection_end: Optional[int] = None  # End position for highlighting
     created_at: datetime
     updated_at: datetime
 
@@ -150,6 +152,8 @@ class SideChatRequest(BaseModel):
     parent_node_id: uuid.UUID  # The main thread message this side chat is attached to
     content: str
     selected_text: Optional[str] = None  # Optional text selection from parent message
+    selection_start: Optional[int] = None  # Start position in parent content (for highlighting)
+    selection_end: Optional[int] = None  # End position in parent content (for highlighting)
     include_main_context: bool = False  # Include main thread context even with selected text
 
 

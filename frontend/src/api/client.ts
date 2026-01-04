@@ -203,10 +203,18 @@ class ApiClient {
   }
 
   // Side Chats
-  async getSideChatThreads(nodeId: string): Promise<{ selectedText: string | null; count: number }[]> {
-    return this.request<{ selectedText: string | null; count: number }[]>(
-      `/nodes/${nodeId}/side-chat-threads`
-    );
+  async getSideChatThreads(nodeId: string): Promise<{
+    selectedText: string | null;
+    selectionStart: number | null;
+    selectionEnd: number | null;
+    count: number;
+  }[]> {
+    return this.request<{
+      selectedText: string | null;
+      selectionStart: number | null;
+      selectionEnd: number | null;
+      count: number;
+    }[]>(`/nodes/${nodeId}/side-chat-threads`);
   }
 
   async getSideChats(nodeId: string, selectedText?: string): Promise<Node[]> {
@@ -220,6 +228,8 @@ class ApiClient {
     parentNodeId: string,
     content: string,
     selectedText: string | undefined,
+    selectionStart: number | undefined,
+    selectionEnd: number | undefined,
     includeMainContext: boolean,
     callbacks: {
       onUserNode: (node: Node) => void;
@@ -229,7 +239,7 @@ class ApiClient {
     }
   ): Promise<void> {
     const url = `${this.baseUrl}/chat/side-chat/stream`;
-    const body = JSON.stringify(transformKeys({ parentNodeId, content, selectedText, includeMainContext }, camelToSnake));
+    const body = JSON.stringify(transformKeys({ parentNodeId, content, selectedText, selectionStart, selectionEnd, includeMainContext }, camelToSnake));
 
     try {
       const response = await fetch(url, {

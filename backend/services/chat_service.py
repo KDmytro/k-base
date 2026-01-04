@@ -174,7 +174,9 @@ The main conversation context is provided for reference."""
         parent_id: UUID | None,
         content: str,
         node_type: str = 'user_message',
-        selected_text: str = None
+        selected_text: str = None,
+        selection_start: int = None,
+        selection_end: int = None
     ) -> Node:
         """Create a user message node."""
         # For side chat messages, don't do sibling tracking
@@ -206,7 +208,9 @@ The main conversation context is provided for reference."""
             node_type=node_type,
             sibling_index=sibling_index,
             is_selected_path=not is_side_chat,  # Side chat nodes don't participate in path
-            selected_text=selected_text if is_side_chat else None  # Only store for side chats
+            selected_text=selected_text if is_side_chat else None,  # Only store for side chats
+            selection_start=selection_start if is_side_chat else None,
+            selection_end=selection_end if is_side_chat else None
         )
         db.add(node)
         await db.flush()
@@ -232,7 +236,9 @@ The main conversation context is provided for reference."""
         content: str,
         generation_config: Dict[str, Any] = None,
         node_type: str = 'assistant_message',
-        selected_text: str = None
+        selected_text: str = None,
+        selection_start: int = None,
+        selection_end: int = None
     ) -> Node:
         """Create an assistant message node."""
         is_side_chat = node_type == 'side_chat_assistant'
@@ -244,6 +250,8 @@ The main conversation context is provided for reference."""
             node_type=node_type,
             is_selected_path=not is_side_chat,  # Side chat nodes don't participate in path
             selected_text=selected_text if is_side_chat else None,  # Only store for side chats
+            selection_start=selection_start if is_side_chat else None,
+            selection_end=selection_end if is_side_chat else None,
             generation_config=generation_config or {
                 "provider": "openai",
                 "model": self.default_model,

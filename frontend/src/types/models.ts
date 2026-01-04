@@ -65,6 +65,9 @@ export interface Node {
 
     // For side chat nodes - the text selection that started this thread
     selectedText?: string;
+    // Character positions for highlighting (relative to parent node's content)
+    selectionStart?: number;
+    selectionEnd?: number;
 
     createdAt: Date;
     updatedAt: Date;

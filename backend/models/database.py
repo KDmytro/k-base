@@ -146,6 +146,9 @@ class Node(Base):
 
     # For side chat nodes - stores the text selection that started the thread
     selected_text = Column(Text, nullable=True)
+    # Character positions for highlighting (relative to parent node's content)
+    selection_start = Column(Integer, nullable=True)
+    selection_end = Column(Integer, nullable=True)
 
     created_at = Column(DateTime(timezone=True), default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
