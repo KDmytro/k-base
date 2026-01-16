@@ -297,6 +297,23 @@ function App() {
     setIsSideChatStreaming(false);
   }, []);
 
+  // Handler for opening side chat from sidebar navigation
+  const handleOpenSideChatFromNav = useCallback(async (nodeId: string, selectedText: string | null) => {
+    // First, scroll to the node in the main chat view
+    const element = document.getElementById(`message-${nodeId}`);
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      // Brief highlight effect
+      element.classList.add('ring-2', 'ring-blue-400', 'ring-opacity-75');
+      setTimeout(() => {
+        element.classList.remove('ring-2', 'ring-blue-400', 'ring-opacity-75');
+      }, 2000);
+    }
+
+    // Then open the side chat panel
+    handleOpenSideChat(nodeId, selectedText || undefined, undefined, undefined);
+  }, [handleOpenSideChat]);
+
   const handleSendSideChat = useCallback(async (content: string, includeMainContext: boolean) => {
     if (!sideChatPanelNodeId) return;
 
@@ -431,6 +448,7 @@ function App() {
         treeNodes={treeNodes}
         currentPath={nodes.map(n => n.id)}
         onSelectTreeNode={handleTreeNavigate}
+        onOpenSideChat={handleOpenSideChatFromNav}
       />
 
       <div className="flex-1 flex flex-col">

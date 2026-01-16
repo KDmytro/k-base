@@ -153,3 +153,12 @@ export interface MemorySearchResponse {
     results: MemorySearchResult[];
     queryTokens: number;
 }
+
+// Side chat thread summary for navigation
+export interface SideChatThread {
+    nodeId: string;             // Parent message node
+    selectedText: string | null;  // null for general side chats
+    messageCount: number;
+    lastMessageAt: Date;
+    previewText: string;        // First message preview
+}

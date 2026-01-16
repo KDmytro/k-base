@@ -4,12 +4,12 @@ from typing import List
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import select, func, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from models.database import Session, Topic, Node, NodeType, get_db
-from models.schemas import SessionCreate, SessionUpdate, SessionResponse, NodeResponse
+from models.schemas import SessionCreate, SessionUpdate, SessionResponse, NodeResponse, SideChatThreadSummary
 
 router = APIRouter(prefix="/sessions", tags=["sessions"])
 
@@ -109,6 +109,63 @@ async def get_session_tree(
         .order_by(Node.created_at)
     )
     return list(result.scalars().all())
+
+
+@router.get("/{session_id}/side-chat-threads", response_model=List[SideChatThreadSummary])
+async def get_session_side_chat_threads(
+    session_id: UUID,
+    db: AsyncSession = Depends(get_db)
+) -> List[SideChatThreadSummary]:
+    """Get all unique side chat threads across all nodes in a session."""
+    # Verify session exists
+    result = await db.execute(select(Session).where(Session.id == session_id))
+    session = result.scalar_one_or_none()
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    # Get all side chat nodes in this session
+    result = await db.execute(
+        select(Node)
+        .where(
+            Node.session_id == session_id,
+            Node.node_type.in_([NodeType.SIDE_CHAT_USER.value, NodeType.SIDE_CHAT_ASSISTANT.value])
+        )
+        .order_by(Node.created_at)
+    )
+    side_chat_nodes = list(result.scalars().all())
+
+    # Group by parent_id + selected_text to identify unique threads
+    threads: dict[tuple[UUID, str | None], list[Node]] = {}
+    for node in side_chat_nodes:
+        key = (node.parent_id, node.selected_text)
+        if key not in threads:
+            threads[key] = []
+        threads[key].append(node)
+
+    # Build summaries
+    summaries = []
+    for (parent_id, selected_text), nodes in threads.items():
+        # Get the first user message as preview
+        first_user_msg = next(
+            (n for n in nodes if n.node_type == NodeType.SIDE_CHAT_USER.value),
+            nodes[0] if nodes else None
+        )
+        preview_text = (first_user_msg.content[:100] + "...") if first_user_msg and len(first_user_msg.content) > 100 else (first_user_msg.content if first_user_msg else "")
+
+        # Get the latest message timestamp
+        last_message_at = max(n.created_at for n in nodes)
+
+        summaries.append(SideChatThreadSummary(
+            node_id=parent_id,
+            selected_text=selected_text,
+            message_count=len(nodes),
+            last_message_at=last_message_at,
+            preview_text=preview_text,
+        ))
+
+    # Sort by last_message_at descending (most recent first)
+    summaries.sort(key=lambda s: s.last_message_at, reverse=True)
+    return summaries
 
 
 # Nested route for sessions within a topic

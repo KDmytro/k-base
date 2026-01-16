@@ -157,6 +157,15 @@ class SideChatRequest(BaseModel):
     include_main_context: bool = False  # Include main thread context even with selected text
 
 
+class SideChatThreadSummary(BaseModel):
+    """Summary of a side chat thread for navigation display."""
+    node_id: uuid.UUID  # Parent message node
+    selected_text: Optional[str]  # null for general side chats
+    message_count: int
+    last_message_at: datetime
+    preview_text: str  # First message preview
+
+
 # ============================================
 # Branch Operation Schemas
 # ============================================

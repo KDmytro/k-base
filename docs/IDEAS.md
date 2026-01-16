@@ -54,6 +54,10 @@ Interactive components that can be added to topics:
 - [ ] Session export (markdown, PDF, JSON)
 - [ ] Session sharing (public links?)
 - [ ] Session duplication/forking
+- [ ] **Promote side chat to session** - Convert a side chat thread into a standalone session
+  - Options: copy vs link (preserve original side chat or move it)
+  - Context inheritance: include parent conversation summary or start fresh
+  - Navigation: maintain link back to source message for reference
 
 ### Conversation Features
 - [ ] Message reactions/ratings

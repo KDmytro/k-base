@@ -321,7 +321,8 @@ export function ChatMessage({ node, isForkPoint = false, forkBranchCount = 0, on
 
   return (
     <div
-      className={`group relative flex gap-3 p-4 ${
+      id={`message-${node.id}`}
+      className={`group relative flex gap-3 p-4 transition-all duration-300 ${
         isUser ? 'bg-white' : 'bg-gray-50'
       } ${isNote ? 'border-l-4 border-yellow-400 bg-yellow-50' : ''}`}
     >

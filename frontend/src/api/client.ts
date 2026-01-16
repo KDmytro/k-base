@@ -10,6 +10,7 @@ import type {
   Node,
   ChatRequest,
   ChatResponse,
+  SideChatThread,
 } from '@/types/models';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
@@ -155,6 +156,10 @@ class ApiClient {
 
   async getSessionTree(sessionId: string): Promise<Node[]> {
     return this.request<Node[]>(`/sessions/${sessionId}/tree`);
+  }
+
+  async getSessionSideChatThreads(sessionId: string): Promise<SideChatThread[]> {
+    return this.request<SideChatThread[]>(`/sessions/${sessionId}/side-chat-threads`);
   }
 
   // Nodes

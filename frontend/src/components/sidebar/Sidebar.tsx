@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Plus, MessageSquare, FolderOpen, GitBranch, Pencil } from 'lucide-react';
+import { Plus, MessageSquare, FolderOpen, GitBranch, Pencil, MessageSquarePlus } from 'lucide-react';
 import { apiClient } from '@/api/client';
 import { TreeView } from './TreeView';
-import type { Topic, Session, Node } from '@/types/models';
+import type { Topic, Session, Node, SideChatThread } from '@/types/models';
 
 interface SidebarProps {
   currentTopicId: string | null;
@@ -14,6 +14,8 @@ interface SidebarProps {
   treeNodes?: Node[];
   currentPath?: string[];
   onSelectTreeNode?: (nodeId: string) => void;
+  // Side chat navigation
+  onOpenSideChat?: (nodeId: string, selectedText: string | null) => void;
 }
 
 export function Sidebar({
@@ -25,6 +27,7 @@ export function Sidebar({
   treeNodes,
   currentPath,
   onSelectTreeNode,
+  onOpenSideChat,
 }: SidebarProps) {
   const [topics, setTopics] = useState<Topic[]>([]);
   const [sessions, setSessions] = useState<Map<string, Session[]>>(new Map());
@@ -33,6 +36,8 @@ export function Sidebar({
   const [newTopicName, setNewTopicName] = useState('');
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
   const [editingSessionName, setEditingSessionName] = useState('');
+  // Side chat threads state
+  const [sessionSideChats, setSessionSideChats] = useState<Map<string, SideChatThread[]>>(new Map());
 
   useEffect(() => {
     loadTopics();
@@ -43,6 +48,13 @@ export function Sidebar({
       loadSessions(currentTopicId);
     }
   }, [currentTopicId]);
+
+  // Load side chat threads when session changes
+  useEffect(() => {
+    if (currentSessionId && !sessionSideChats.has(currentSessionId)) {
+      loadSideChatThreads(currentSessionId);
+    }
+  }, [currentSessionId]);
 
   const loadTopics = async () => {
     try {
@@ -59,6 +71,21 @@ export function Sidebar({
       setSessions((prev) => new Map(prev).set(topicId, data));
     } catch (err) {
       console.error('Failed to load sessions:', err);
+    }
+  };
+
+  const loadSideChatThreads = async (sessionId: string) => {
+    try {
+      const data = await apiClient.getSessionSideChatThreads(sessionId);
+      setSessionSideChats((prev) => new Map(prev).set(sessionId, data));
+    } catch (err) {
+      console.error('Failed to load side chat threads:', err);
+    }
+  };
+
+  const handleSideChatClick = (nodeId: string, selectedText: string | null) => {
+    if (onOpenSideChat) {
+      onOpenSideChat(nodeId, selectedText);
     }
   };
 
@@ -200,46 +227,82 @@ export function Sidebar({
 
             {expandedTopics.has(topic.id) && (
               <div className="ml-4 border-l border-gray-700">
-                {(sessions.get(topic.id) || []).map((session) => (
-                  <div key={session.id} className="group relative">
-                    {editingSessionId === session.id ? (
-                      <div className="flex items-center gap-1 px-4 py-1.5">
-                        <MessageSquare size={14} className="text-gray-500 flex-shrink-0" />
-                        <input
-                          type="text"
-                          value={editingSessionName}
-                          onChange={(e) => setEditingSessionName(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') handleRenameSession(topic.id);
-                            if (e.key === 'Escape') setEditingSessionId(null);
-                          }}
-                          onBlur={() => handleRenameSession(topic.id)}
-                          className="flex-1 px-1 py-0.5 bg-gray-800 rounded text-sm text-white min-w-0"
-                          autoFocus
-                        />
+                {(sessions.get(topic.id) || []).map((session) => {
+                  const sideChats = sessionSideChats.get(session.id) || [];
+                  const sideChatCount = sideChats.length;
+
+                  return (
+                    <div key={session.id}>
+                      <div className="group relative">
+                        {editingSessionId === session.id ? (
+                          <div className="flex items-center gap-1 px-4 py-1.5">
+                            <MessageSquare size={14} className="text-gray-500 flex-shrink-0" />
+                            <input
+                              type="text"
+                              value={editingSessionName}
+                              onChange={(e) => setEditingSessionName(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') handleRenameSession(topic.id);
+                                if (e.key === 'Escape') setEditingSessionId(null);
+                              }}
+                              onBlur={() => handleRenameSession(topic.id)}
+                              className="flex-1 px-1 py-0.5 bg-gray-800 rounded text-sm text-white min-w-0"
+                              autoFocus
+                            />
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => onSelectSession(topic.id, session.id)}
+                            onDoubleClick={() => handleStartRename(session)}
+                            className={`w-full flex items-center gap-2 px-4 py-2 text-sm hover:bg-gray-800 ${
+                              currentSessionId === session.id ? 'bg-gray-700' : ''
+                            }`}
+                          >
+                            <MessageSquare size={14} className="text-gray-500 flex-shrink-0" />
+                            <span className="truncate text-gray-300 flex-1 text-left">{session.name}</span>
+                            {sideChatCount > 0 && (
+                              <span className="px-1.5 py-0.5 text-xs bg-blue-600 text-white rounded-full flex-shrink-0">
+                                {sideChatCount}
+                              </span>
+                            )}
+                            <Pencil
+                              size={12}
+                              className="text-gray-500 opacity-0 group-hover:opacity-100 hover:text-gray-300 flex-shrink-0"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleStartRename(session);
+                              }}
+                            />
+                          </button>
+                        )}
                       </div>
-                    ) : (
-                      <button
-                        onClick={() => onSelectSession(topic.id, session.id)}
-                        onDoubleClick={() => handleStartRename(session)}
-                        className={`w-full flex items-center gap-2 px-4 py-2 text-sm hover:bg-gray-800 ${
-                          currentSessionId === session.id ? 'bg-gray-700' : ''
-                        }`}
-                      >
-                        <MessageSquare size={14} className="text-gray-500 flex-shrink-0" />
-                        <span className="truncate text-gray-300 flex-1 text-left">{session.name}</span>
-                        <Pencil
-                          size={12}
-                          className="text-gray-500 opacity-0 group-hover:opacity-100 hover:text-gray-300 flex-shrink-0"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleStartRename(session);
-                          }}
-                        />
-                      </button>
-                    )}
-                  </div>
-                ))}
+
+                      {/* Side Chat Threads - show directly under selected session */}
+                      {currentSessionId === session.id && sideChatCount > 0 && (
+                        <div className="ml-4 border-l border-gray-600">
+                          {sideChats.map((thread, idx) => (
+                            <button
+                              key={`${thread.nodeId}-${thread.selectedText || 'general'}-${idx}`}
+                              onClick={() => handleSideChatClick(thread.nodeId, thread.selectedText)}
+                              className="w-full flex items-center gap-2 px-4 py-1.5 text-xs text-gray-400 hover:bg-gray-800 hover:text-gray-300"
+                              title={thread.previewText}
+                            >
+                              <MessageSquarePlus size={12} className="flex-shrink-0" />
+                              <span className="truncate flex-1 text-left">
+                                {thread.selectedText
+                                  ? `"${thread.selectedText.length > 20 ? thread.selectedText.slice(0, 20) + '...' : thread.selectedText}"`
+                                  : '(general)'}
+                              </span>
+                              <span className="text-gray-500 flex-shrink-0">
+                                {thread.messageCount}
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
                 <button
                   onClick={() => handleCreateSession(topic.id)}
                   className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-500 hover:bg-gray-800 hover:text-gray-300"
