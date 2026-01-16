@@ -13,6 +13,8 @@ import type {
   SideChatThread,
   User,
   AuthResponse,
+  UserPreferences,
+  UserPreferencesUpdate,
 } from '@/types/models';
 import { useAuthStore } from '@/stores/authStore';
 
@@ -123,6 +125,18 @@ class ApiClient {
 
   async getCurrentUser(): Promise<User> {
     return this.request<User>('/auth/me');
+  }
+
+  // User Preferences
+  async getPreferences(): Promise<UserPreferences | null> {
+    return this.request<UserPreferences | null>('/users/me/preferences');
+  }
+
+  async updatePreferences(data: UserPreferencesUpdate): Promise<UserPreferences> {
+    return this.request<UserPreferences>('/users/me/preferences', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
   }
 
   // Topics

@@ -71,6 +71,7 @@ from api.routes.topics import router as topics_router
 from api.routes.sessions import router as sessions_router, topics_sessions_router
 from api.routes.nodes import router as nodes_router, sessions_nodes_router
 from api.routes.chat import router as chat_router
+from api.routes.users import router as users_router
 
 app.include_router(auth_router, prefix="/api/v1")
 app.include_router(topics_router, prefix="/api/v1")
@@ -79,6 +80,7 @@ app.include_router(topics_sessions_router, prefix="/api/v1")
 app.include_router(nodes_router, prefix="/api/v1")
 app.include_router(sessions_nodes_router, prefix="/api/v1")
 app.include_router(chat_router, prefix="/api/v1")
+app.include_router(users_router, prefix="/api/v1")
 
 
 if __name__ == "__main__":

@@ -9,11 +9,19 @@ from sqlalchemy.ext.asyncio import AsyncSession
 import json
 
 from api.auth import get_current_user
-from models.database import Session, Node, Topic, User, NodeType, get_db, async_session_maker
+from models.database import Session, Node, Topic, User, UserPreferences, NodeType, get_db, async_session_maker
 from models.schemas import ChatRequest, ChatResponse, NodeResponse, SideChatRequest
 from services.chat_service import chat_service
 
 router = APIRouter(prefix="/chat", tags=["chat"])
+
+
+async def get_user_preferences(user_id: UUID, db: AsyncSession) -> UserPreferences | None:
+    """Fetch user preferences for the current user."""
+    result = await db.execute(
+        select(UserPreferences).where(UserPreferences.user_id == user_id)
+    )
+    return result.scalar_one_or_none()
 
 
 async def verify_session_ownership(session_id: UUID, user: User, db: AsyncSession) -> Session:
@@ -50,10 +58,20 @@ async def send_message(
     db: AsyncSession = Depends(get_db),
 ) -> ChatResponse:
     """Send a message and get AI response."""
-    await verify_session_ownership(request.session_id, current_user, db)
+    session = await verify_session_ownership(request.session_id, current_user, db)
 
     if request.parent_node_id:
         await verify_node_ownership(request.parent_node_id, current_user, db)
+
+    # Fetch user preferences for system prompt injection
+    preferences = await get_user_preferences(current_user.id, db)
+
+    # Resolve which model to use
+    model = chat_service.resolve_model(
+        request.model,
+        session.default_model,
+        preferences.preferred_model if preferences else None
+    )
 
     user_node = await chat_service.create_user_node(
         db=db,
@@ -66,14 +84,15 @@ async def send_message(
     if request.parent_node_id:
         path = await chat_service.get_conversation_path(db, request.parent_node_id)
 
-    messages = chat_service.build_messages(path, request.content)
-    response_content = await chat_service.generate_response(messages)
+    messages = chat_service.build_messages(path, request.content, preferences)
+    response_content = await chat_service.generate_response(messages, model=model)
 
     assistant_node = await chat_service.create_assistant_node(
         db=db,
         session_id=request.session_id,
         parent_id=user_node.id,
-        content=response_content
+        content=response_content,
+        model=model
     )
 
     return ChatResponse(
@@ -90,10 +109,20 @@ async def send_message_stream(
     db: AsyncSession = Depends(get_db),
 ):
     """Send a message and get streaming AI response."""
-    await verify_session_ownership(request.session_id, current_user, db)
+    session = await verify_session_ownership(request.session_id, current_user, db)
 
     if request.parent_node_id:
         await verify_node_ownership(request.parent_node_id, current_user, db)
+
+    # Fetch user preferences for system prompt injection
+    preferences = await get_user_preferences(current_user.id, db)
+
+    # Resolve which model to use
+    model = chat_service.resolve_model(
+        request.model,
+        session.default_model,
+        preferences.preferred_model if preferences else None
+    )
 
     user_node = await chat_service.create_user_node(
         db=db,
@@ -107,7 +136,7 @@ async def send_message_stream(
     if request.parent_node_id:
         path = await chat_service.get_conversation_path(db, request.parent_node_id)
 
-    messages = chat_service.build_messages(path, request.content)
+    messages = chat_service.build_messages(path, request.content, preferences)
 
     session_id = request.session_id
     user_node_id = user_node.id
@@ -117,7 +146,7 @@ async def send_message_stream(
         full_response = ""
         yield f"data: {json.dumps({'type': 'user_node', 'node': user_node_response})}\n\n"
 
-        async for token in chat_service.generate_response_stream(messages):
+        async for token in chat_service.generate_response_stream(messages, model=model):
             full_response += token
             yield f"data: {json.dumps({'type': 'token', 'token': token})}\n\n"
 
@@ -127,7 +156,8 @@ async def send_message_stream(
                     db=stream_db,
                     session_id=session_id,
                     parent_id=user_node_id,
-                    content=full_response
+                    content=full_response,
+                    model=model
                 )
                 await stream_db.commit()
                 yield f"data: {json.dumps({'type': 'complete', 'node': NodeResponse.model_validate(assistant_node).model_dump(mode='json')})}\n\n"
@@ -150,6 +180,9 @@ async def send_side_chat_stream(
 ):
     """Send a message in a side chat and get streaming AI response."""
     parent_node = await verify_node_ownership(request.parent_node_id, current_user, db)
+
+    # Fetch user preferences for system prompt injection
+    preferences = await get_user_preferences(current_user.id, db)
 
     main_path = await chat_service.get_conversation_path(db, request.parent_node_id)
 
@@ -183,7 +216,7 @@ async def send_side_chat_stream(
 
     messages = chat_service.build_side_chat_messages(
         main_path, side_chat_history, request.content, request.selected_text,
-        request.include_main_context
+        request.include_main_context, preferences
     )
 
     session_id = parent_node.session_id
@@ -241,12 +274,15 @@ async def regenerate_response(
     if not node.parent_id:
         raise HTTPException(status_code=400, detail="Cannot regenerate root node")
 
+    # Fetch user preferences for system prompt injection
+    preferences = await get_user_preferences(current_user.id, db)
+
     path = await chat_service.get_conversation_path(db, node.parent_id)
 
     result = await db.execute(select(Node).where(Node.id == node.parent_id))
     user_node = result.scalar_one()
 
-    messages = chat_service.build_messages(path[:-1] if path else [], user_node.content)
+    messages = chat_service.build_messages(path[:-1] if path else [], user_node.content, preferences)
     response_content = await chat_service.generate_response(messages)
 
     result = await db.execute(select(Node).where(Node.parent_id == node.parent_id))

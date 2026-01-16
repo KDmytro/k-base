@@ -10,6 +10,21 @@ from models.database import NodeType, NodeStatus, ChunkType
 
 
 # ============================================
+# Available LLM Models Registry
+# ============================================
+
+AVAILABLE_MODELS = {
+    "gpt-4o": {"provider": "openai", "display": "GPT-4o"},
+    "gpt-4o-mini": {"provider": "openai", "display": "GPT-4o Mini"},
+    "claude-opus-4-5-20251101": {"provider": "anthropic", "display": "Claude Opus 4.5"},
+    "claude-sonnet-4-20250514": {"provider": "anthropic", "display": "Claude Sonnet 4"},
+    "claude-3-5-haiku-20241022": {"provider": "anthropic", "display": "Claude Haiku 3.5"},
+    "gemini/gemini-2.0-flash": {"provider": "google", "display": "Gemini 2.0 Flash"},
+    "gemini/gemini-2.0-pro-exp-02-05": {"provider": "google", "display": "Gemini 2.0 Pro"},
+}
+
+
+# ============================================
 # Topic Schemas
 # ============================================
 
@@ -46,12 +61,14 @@ class SessionCreate(BaseModel):
     topic_id: uuid.UUID
     name: str = Field(..., max_length=255)
     description: Optional[str] = None
+    default_model: Optional[str] = None
 
 
 class SessionUpdate(BaseModel):
     """Schema for updating a session."""
     name: Optional[str] = Field(None, max_length=255)
     description: Optional[str] = None
+    default_model: Optional[str] = None
 
 
 class SessionResponse(BaseModel):
@@ -61,6 +78,7 @@ class SessionResponse(BaseModel):
     name: str
     description: Optional[str]
     root_node_id: Optional[uuid.UUID]
+    default_model: Optional[str]
     created_at: datetime
     updated_at: datetime
 
@@ -138,6 +156,7 @@ class ChatRequest(BaseModel):
     content: str
     create_branch: bool = False  # Force new branch even if continuing
     include_rag: bool = True  # Whether to include RAG context
+    model: Optional[str] = None  # Per-message model override
 
 
 class ChatResponse(BaseModel):
@@ -155,6 +174,7 @@ class SideChatRequest(BaseModel):
     selection_start: Optional[int] = None  # Start position in parent content (for highlighting)
     selection_end: Optional[int] = None  # End position in parent content (for highlighting)
     include_main_context: bool = False  # Include main thread context even with selected text
+    model: Optional[str] = None  # Per-message model override
 
 
 class SideChatThreadSummary(BaseModel):
@@ -216,3 +236,30 @@ class MemoryStats(BaseModel):
     total_chunks: int
     by_type: Dict[str, int]
     total_tokens: int
+
+
+# ============================================
+# User Preferences Schemas
+# ============================================
+
+class UserPreferencesUpdate(BaseModel):
+    """Schema for updating user preferences."""
+    background: Optional[str] = Field(None, max_length=2000)
+    interests: Optional[str] = Field(None, max_length=1000)
+    custom_instructions: Optional[str] = Field(None, max_length=4000)
+    preferred_model: Optional[str] = None
+
+
+class UserPreferencesResponse(BaseModel):
+    """Schema for user preferences responses."""
+    id: uuid.UUID
+    user_id: uuid.UUID
+    background: Optional[str]
+    interests: Optional[str]
+    custom_instructions: Optional[str]
+    preferred_model: Optional[str]
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True

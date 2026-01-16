@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Plus, MessageSquare, FolderOpen, GitBranch, Pencil, MessageSquarePlus, LogOut, User } from 'lucide-react';
+import { Plus, MessageSquare, FolderOpen, GitBranch, Pencil, MessageSquarePlus, LogOut, User, Settings } from 'lucide-react';
 import { apiClient } from '@/api/client';
 import { TreeView } from './TreeView';
 import { useAuthStore } from '@/stores/authStore';
+import { useSettingsStore } from '@/stores/settingsStore';
 import type { Topic, Session, Node, SideChatThread } from '@/types/models';
 
 interface SidebarProps {
@@ -342,6 +343,7 @@ export function Sidebar({
 
 function UserMenu() {
   const { user, clearAuth } = useAuthStore();
+  const { setOpen: openSettings } = useSettingsStore();
 
   const handleLogout = () => {
     clearAuth();
@@ -368,6 +370,13 @@ function UserMenu() {
           <p className="text-sm font-medium truncate">{user.name || 'User'}</p>
           <p className="text-xs text-gray-400 truncate">{user.email}</p>
         </div>
+        <button
+          onClick={() => openSettings(true)}
+          className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded"
+          title="Settings"
+        >
+          <Settings size={16} />
+        </button>
         <button
           onClick={handleLogout}
           className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded"

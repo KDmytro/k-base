@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Sidebar } from '@/components/sidebar/Sidebar';
 import { ChatThread } from '@/components/chat/ChatThread';
+import { SettingsPanel } from '@/components/settings/SettingsPanel';
 import { apiClient } from '@/api/client';
 import type { Node, Session } from '@/types/models';
 
@@ -499,6 +500,9 @@ function App() {
           </div>
         )}
       </div>
+
+      {/* Settings Panel */}
+      <SettingsPanel />
     </div>
   );
 }

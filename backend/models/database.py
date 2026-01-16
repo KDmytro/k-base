@@ -84,6 +84,28 @@ class User(Base):
 
     # Relationships
     topics = relationship("Topic", back_populates="user", cascade="all, delete-orphan")
+    preferences = relationship("UserPreferences", back_populates="user", uselist=False, cascade="all, delete-orphan")
+
+
+class UserPreferences(Base):
+    """User preferences for customizing AI behavior."""
+    __tablename__ = "user_preferences"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), unique=True, nullable=False)
+    background = Column(Text, nullable=True)  # User bio/background
+    interests = Column(Text, nullable=True)  # Domains of interest
+    custom_instructions = Column(Text, nullable=True)  # Freeform instructions for AI
+    preferred_model = Column(String(100), nullable=True)  # User's default model
+    created_at = Column(DateTime(timezone=True), default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    # Relationships
+    user = relationship("User", back_populates="preferences")
+
+    __table_args__ = (
+        Index('idx_user_preferences_user_id', 'user_id'),
+    )
 
 
 class Topic(Base):
@@ -117,6 +139,7 @@ class Session(Base):
     name = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)
     root_node_id = Column(UUID(as_uuid=True), nullable=True)  # Set after first node created
+    default_model = Column(String(100), nullable=True)  # Session-level model override
     created_at = Column(DateTime(timezone=True), default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 

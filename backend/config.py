@@ -19,6 +19,8 @@ class Settings(BaseSettings):
     # LLM Providers
     openai_api_key: str
     anthropic_api_key: Optional[str] = None
+    google_api_key: Optional[str] = None  # GOOGLE_API_KEY for Gemini models
+    default_model: str = "gpt-4o-mini"
 
     # Application
     app_env: str = "development"

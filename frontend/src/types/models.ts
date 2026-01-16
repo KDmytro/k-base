@@ -179,3 +179,20 @@ export interface AuthResponse {
     tokenType: string;
     user: User;
 }
+
+// User Preferences
+export interface UserPreferences {
+    id: string;
+    userId: string;
+    background: string | null;
+    interests: string | null;
+    customInstructions: string | null;
+    createdAt: Date;
+    updatedAt: Date;
+}
+
+export interface UserPreferencesUpdate {
+    background?: string | null;
+    interests?: string | null;
+    customInstructions?: string | null;
+}
