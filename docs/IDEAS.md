@@ -5,6 +5,7 @@ Raw brainstorming and feature ideas for future development.
 ## Deep Dive Documents
 
 - [Branch Merge Feature](./ai-merge.md) - Merging content from one branch into another
+- [Agentic Architecture](./agentic-architecture.md) - Upgrading from direct API calls to agentic frameworks
 
 ---
 
@@ -77,6 +78,40 @@ Interactive components that can be added to topics:
 - [ ] Auto-summarize long branches
 - [ ] Detect and link related topics
 
+### User Persona & Preferences
+Define how information is presented to you.
+
+- [ ] User profile with background info (profession, interests, expertise level)
+- [ ] Response style preferences:
+  - Academic/technical vs casual/accessible
+  - Concise vs detailed explanations
+  - Include citations/sources vs summarized info
+  - Math/formulas welcome vs plain language
+- [ ] Domain interests (exact sciences, nature, universe, engineering, etc.)
+- [ ] "Less fluff" mode - skip caveats, hedging, and filler
+- [ ] Per-topic preference overrides (different style for learning vs problem-solving)
+- [ ] Inject preferences into system prompt automatically
+- [ ] Preference presets (e.g., "Engineer", "Researcher", "Student", "Casual learner")
+
+### Modes & Skills
+Toggleable capabilities and ad-hoc tools that change what the AI can do.
+
+- [ ] Built-in modes:
+  - Research mode - cite sources, cross-reference, fact-check
+  - Teaching mode - examples, exercises, check understanding
+  - Debugging mode - systematic problem-solving, hypothesis testing
+  - Code review mode - security, best practices, performance
+  - Socratic mode - answer with questions, guide discovery
+- [ ] Ad-hoc tools (enable per session/topic):
+  - Calculator / math solver
+  - Diagram generator (Mermaid, ASCII)
+  - Code execution sandbox
+  - Web search / fact lookup
+  - Citation formatter
+- [ ] Custom skills - user-defined prompt snippets or tool configs
+- [ ] Skill marketplace? Share/import community skills
+- [ ] Mode combinations (e.g., "Teaching + Research" for academic tutoring)
+
 ### Integration Ideas
 - [ ] Import from ChatGPT/Claude exports
 - [ ] Obsidian-style linking between topics
@@ -129,4 +164,4 @@ Interactive components that can be added to topics:
 
 ---
 
-*Last Updated: 2026-01-04*
+*Last Updated: 2026-01-15*
