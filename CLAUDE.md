@@ -14,7 +14,7 @@ K-Base is a branching brainstorming and learning application that treats convers
 - Auth: Google OAuth + JWT
 
 **Production URLs:**
-- Frontend: https://k-base-app.web.app (Firebase Hosting)
+- Frontend: https://kbase.kdmytro.com (custom domain) or https://k-base-app.web.app (Firebase Hosting)
 - Backend: https://kbase-backend-589116738750.us-central1.run.app (Cloud Run)
 - Database: Cloud SQL PostgreSQL (k-base-app:us-central1:kbase-db)
 

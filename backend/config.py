@@ -44,6 +44,7 @@ class Settings(BaseSettings):
         "http://localhost:3000",
         "https://k-base-app.web.app",
         "https://k-base-app.firebaseapp.com",
+        "https://kbase.kdmytro.com",
     ]
 
     @property

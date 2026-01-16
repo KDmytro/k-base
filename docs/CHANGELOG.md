@@ -2,6 +2,42 @@
 
 All notable changes to K-Base are documented in this file.
 
+## [Unreleased] - 2026-01-16
+
+### Added
+
+#### Multi-Provider LLM Support
+- **7 models across 3 providers**: OpenAI (GPT-4o, GPT-4o Mini), Anthropic (Claude Opus 4.5, Sonnet 4, Haiku 3.5), Google (Gemini 2.0 Flash, Gemini 2.0 Pro)
+- **Model selection UI**: Dropdown in chat input to select model per message
+- **Model resolution priority**: Per-message > Session default > User preference > System default
+- **AVAILABLE_MODELS registry**: Centralized model definitions in `backend/models/schemas.py`
+- **New endpoint**: `GET /api/v1/chat/models` returns available models
+- **Database fields**: `preferred_model` on UserPreferences, `default_model` on Session
+
+#### Custom Domain
+- **Production URL**: https://kbase.kdmytro.com (Firebase Hosting custom domain)
+- **DNS setup**: CNAME via Vercel DNS, CAA record for Google SSL certificates
+
+#### GCP Infrastructure
+- **New secret**: `google-api-key` for Gemini models in Secret Manager
+
+### Technical Changes
+
+#### Backend
+- Added `resolve_model()` and `get_provider()` methods to ChatService
+- Updated all chat endpoints to use model resolution chain
+- Added `model` parameter to `create_assistant_node()` for accurate generation_config
+- Added `GOOGLE_API_KEY` environment variable support in config.py
+- Added `kbase.kdmytro.com` to CORS allowed origins
+
+#### Frontend
+- Added `ModelInfo` and `ModelsResponse` types
+- Added `getModels()` method to API client
+- Added model selector dropdown to `ChatInput` component
+- Updated `onSend` callback to pass selected model
+
+---
+
 ## [Unreleased] - 2026-01-04
 
 ### Added

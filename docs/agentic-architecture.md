@@ -16,6 +16,41 @@ The existing Node tree with `parent_id` already handles session state. Agentic f
 
 ---
 
+## Existing Infrastructure (Already Implemented)
+
+Foundation already in place that the agentic architecture builds on:
+
+### User Preferences
+- **Model**: `UserPreferences` with `background`, `interests`, `custom_instructions`
+- **API**: `GET/PUT /users/me/preferences`
+- **Injection**: Preferences automatically injected into system prompt for all chat endpoints
+- **UI**: `SettingsPanel` component accessible via gear icon in sidebar
+- **Storage**: Zustand store with localStorage persistence
+
+### Model Selection
+- **Hierarchy**: `request > session > user preference > system default`
+- **Registry**: `AVAILABLE_MODELS` in `backend/models/schemas.py`
+- **Fields**: `preferred_model` on user preferences, `default_model` on sessions
+- **UI**: Model selector in ChatInput component
+
+### How This Enables Agentic Features
+
+| Existing | Enables |
+|----------|---------|
+| Preference injection | Modes inject preset prompts the same way |
+| Model selection hierarchy | Agentic mode can override model per-request |
+| Settings UI pattern | Skills/modes toggles follow same pattern |
+| `custom_instructions` field | User-defined skills stored here |
+
+### Key Files
+- `backend/models/schemas.py` - `UserPreferences`, `AVAILABLE_MODELS`
+- `backend/api/routes/users.py` - Preferences endpoints
+- `backend/services/chat_service.py` - System prompt injection
+- `frontend/src/components/settings/SettingsPanel.tsx` - Settings UI
+- `frontend/src/stores/settingsStore.ts` - Client-side state
+
+---
+
 ## Chat Modes
 
 ```
@@ -176,3 +211,4 @@ quiz_tool = Tool(
 ---
 
 *Created: 2026-01-15*
+*Updated: 2026-01-16* - Added existing infrastructure section
