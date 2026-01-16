@@ -162,3 +162,20 @@ export interface SideChatThread {
     lastMessageAt: Date;
     previewText: string;        // First message preview
 }
+
+// User type
+export interface User {
+    id: string;
+    email: string;
+    name?: string;
+    picture?: string;
+    createdAt: Date;
+    updatedAt: Date;
+}
+
+// Auth response from backend
+export interface AuthResponse {
+    accessToken: string;
+    tokenType: string;
+    user: User;
+}

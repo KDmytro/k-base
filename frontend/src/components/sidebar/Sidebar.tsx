@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Plus, MessageSquare, FolderOpen, GitBranch, Pencil, MessageSquarePlus } from 'lucide-react';
+import { Plus, MessageSquare, FolderOpen, GitBranch, Pencil, MessageSquarePlus, LogOut, User } from 'lucide-react';
 import { apiClient } from '@/api/client';
 import { TreeView } from './TreeView';
+import { useAuthStore } from '@/stores/authStore';
 import type { Topic, Session, Node, SideChatThread } from '@/types/models';
 
 interface SidebarProps {
@@ -332,6 +333,49 @@ export function Sidebar({
           </div>
         </div>
       )}
+
+      {/* User Menu */}
+      <UserMenu />
+    </div>
+  );
+}
+
+function UserMenu() {
+  const { user, clearAuth } = useAuthStore();
+
+  const handleLogout = () => {
+    clearAuth();
+    window.location.reload();
+  };
+
+  if (!user) return null;
+
+  return (
+    <div className="border-t border-gray-700 p-3">
+      <div className="flex items-center gap-3">
+        {user.picture ? (
+          <img
+            src={user.picture}
+            alt={user.name || 'User'}
+            className="w-8 h-8 rounded-full"
+          />
+        ) : (
+          <div className="w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center">
+            <User size={16} className="text-gray-400" />
+          </div>
+        )}
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium truncate">{user.name || 'User'}</p>
+          <p className="text-xs text-gray-400 truncate">{user.email}</p>
+        </div>
+        <button
+          onClick={handleLogout}
+          className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded"
+          title="Sign out"
+        >
+          <LogOut size={16} />
+        </button>
+      </div>
     </div>
   );
 }

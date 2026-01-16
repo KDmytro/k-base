@@ -7,7 +7,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from models.database import Topic, get_db
+from api.auth import get_current_user
+from models.database import Topic, User, get_db
 from models.schemas import TopicCreate, TopicUpdate, TopicResponse
 
 router = APIRouter(prefix="/topics", tags=["topics"])
@@ -16,10 +17,15 @@ router = APIRouter(prefix="/topics", tags=["topics"])
 @router.post("", response_model=TopicResponse, status_code=status.HTTP_201_CREATED)
 async def create_topic(
     topic: TopicCreate,
-    db: AsyncSession = Depends(get_db)
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ) -> Topic:
-    """Create a new topic."""
-    db_topic = Topic(name=topic.name, description=topic.description)
+    """Create a new topic for the current user."""
+    db_topic = Topic(
+        user_id=current_user.id,
+        name=topic.name,
+        description=topic.description,
+    )
     db.add(db_topic)
     await db.flush()
     await db.refresh(db_topic)
@@ -30,11 +36,13 @@ async def create_topic(
 async def list_topics(
     limit: int = 50,
     offset: int = 0,
-    db: AsyncSession = Depends(get_db)
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ) -> List[Topic]:
-    """List all topics."""
+    """List all topics for the current user."""
     result = await db.execute(
         select(Topic)
+        .where(Topic.user_id == current_user.id)
         .order_by(Topic.updated_at.desc())
         .offset(offset)
         .limit(limit)
@@ -45,10 +53,13 @@ async def list_topics(
 @router.get("/{topic_id}", response_model=TopicResponse)
 async def get_topic(
     topic_id: UUID,
-    db: AsyncSession = Depends(get_db)
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ) -> Topic:
-    """Get a topic by ID."""
-    result = await db.execute(select(Topic).where(Topic.id == topic_id))
+    """Get a topic by ID (must belong to current user)."""
+    result = await db.execute(
+        select(Topic).where(Topic.id == topic_id, Topic.user_id == current_user.id)
+    )
     topic = result.scalar_one_or_none()
     if not topic:
         raise HTTPException(status_code=404, detail="Topic not found")
@@ -59,10 +70,13 @@ async def get_topic(
 async def update_topic(
     topic_id: UUID,
     topic_update: TopicUpdate,
-    db: AsyncSession = Depends(get_db)
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ) -> Topic:
-    """Update a topic."""
-    result = await db.execute(select(Topic).where(Topic.id == topic_id))
+    """Update a topic (must belong to current user)."""
+    result = await db.execute(
+        select(Topic).where(Topic.id == topic_id, Topic.user_id == current_user.id)
+    )
     topic = result.scalar_one_or_none()
     if not topic:
         raise HTTPException(status_code=404, detail="Topic not found")
@@ -79,10 +93,13 @@ async def update_topic(
 @router.delete("/{topic_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_topic(
     topic_id: UUID,
-    db: AsyncSession = Depends(get_db)
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ) -> None:
-    """Delete a topic and all its sessions/nodes."""
-    result = await db.execute(select(Topic).where(Topic.id == topic_id))
+    """Delete a topic and all its sessions/nodes (must belong to current user)."""
+    result = await db.execute(
+        select(Topic).where(Topic.id == topic_id, Topic.user_id == current_user.id)
+    )
     topic = result.scalar_one_or_none()
     if not topic:
         raise HTTPException(status_code=404, detail="Topic not found")

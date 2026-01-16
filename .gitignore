@@ -54,3 +54,10 @@ frontend/build/
 # Note: Keep alembic/versions/* tracked
 alembic/__pycache__/
 .claude/
+.envrc
+
+# Firebase
+.firebase/
+
+# Production env (contains credentials)
+frontend/.env.production

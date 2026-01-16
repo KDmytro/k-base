@@ -8,32 +8,53 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 import json
 
-from models.database import Session, Node, NodeType, get_db, async_session_maker
+from api.auth import get_current_user
+from models.database import Session, Node, Topic, User, NodeType, get_db, async_session_maker
 from models.schemas import ChatRequest, ChatResponse, NodeResponse, SideChatRequest
 from services.chat_service import chat_service
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 
 
-@router.post("", response_model=ChatResponse)
-async def send_message(
-    request: ChatRequest,
-    db: AsyncSession = Depends(get_db)
-) -> ChatResponse:
-    """Send a message and get AI response."""
-    # Verify session exists
-    result = await db.execute(select(Session).where(Session.id == request.session_id))
+async def verify_session_ownership(session_id: UUID, user: User, db: AsyncSession) -> Session:
+    """Verify that a session belongs to the current user (via topic)."""
+    result = await db.execute(
+        select(Session)
+        .join(Topic)
+        .where(Session.id == session_id, Topic.user_id == user.id)
+    )
     session = result.scalar_one_or_none()
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
+    return session
 
-    # Verify parent node exists if specified
+
+async def verify_node_ownership(node_id: UUID, user: User, db: AsyncSession) -> Node:
+    """Verify that a node belongs to the current user (via session -> topic)."""
+    result = await db.execute(
+        select(Node)
+        .join(Session)
+        .join(Topic)
+        .where(Node.id == node_id, Topic.user_id == user.id)
+    )
+    node = result.scalar_one_or_none()
+    if not node:
+        raise HTTPException(status_code=404, detail="Node not found")
+    return node
+
+
+@router.post("", response_model=ChatResponse)
+async def send_message(
+    request: ChatRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> ChatResponse:
+    """Send a message and get AI response."""
+    await verify_session_ownership(request.session_id, current_user, db)
+
     if request.parent_node_id:
-        result = await db.execute(select(Node).where(Node.id == request.parent_node_id))
-        if not result.scalar_one_or_none():
-            raise HTTPException(status_code=404, detail="Parent node not found")
+        await verify_node_ownership(request.parent_node_id, current_user, db)
 
-    # Create user message node
     user_node = await chat_service.create_user_node(
         db=db,
         session_id=request.session_id,
@@ -41,17 +62,13 @@ async def send_message(
         content=request.content
     )
 
-    # Build conversation context
     path = []
     if request.parent_node_id:
         path = await chat_service.get_conversation_path(db, request.parent_node_id)
 
     messages = chat_service.build_messages(path, request.content)
-
-    # Generate AI response
     response_content = await chat_service.generate_response(messages)
 
-    # Create assistant message node
     assistant_node = await chat_service.create_assistant_node(
         db=db,
         session_id=request.session_id,
@@ -62,62 +79,48 @@ async def send_message(
     return ChatResponse(
         user_node=NodeResponse.model_validate(user_node),
         assistant_node=NodeResponse.model_validate(assistant_node),
-        memories_used=[]  # RAG not implemented yet
+        memories_used=[]
     )
 
 
 @router.post("/stream")
 async def send_message_stream(
     request: ChatRequest,
-    db: AsyncSession = Depends(get_db)
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ):
     """Send a message and get streaming AI response."""
-    # Verify session exists
-    result = await db.execute(select(Session).where(Session.id == request.session_id))
-    session = result.scalar_one_or_none()
-    if not session:
-        raise HTTPException(status_code=404, detail="Session not found")
+    await verify_session_ownership(request.session_id, current_user, db)
 
-    # Verify parent node exists if specified
     if request.parent_node_id:
-        result = await db.execute(select(Node).where(Node.id == request.parent_node_id))
-        if not result.scalar_one_or_none():
-            raise HTTPException(status_code=404, detail="Parent node not found")
+        await verify_node_ownership(request.parent_node_id, current_user, db)
 
-    # Create user message node
     user_node = await chat_service.create_user_node(
         db=db,
         session_id=request.session_id,
         parent_id=request.parent_node_id,
         content=request.content
     )
-    # Commit user node immediately so it's saved even if streaming fails
     await db.commit()
 
-    # Build conversation context
     path = []
     if request.parent_node_id:
         path = await chat_service.get_conversation_path(db, request.parent_node_id)
 
     messages = chat_service.build_messages(path, request.content)
 
-    # Capture values needed in generator (db session will be closed)
     session_id = request.session_id
     user_node_id = user_node.id
     user_node_response = NodeResponse.model_validate(user_node).model_dump(mode='json')
 
     async def stream_response():
         full_response = ""
-
-        # Send user node info first
         yield f"data: {json.dumps({'type': 'user_node', 'node': user_node_response})}\n\n"
 
-        # Stream AI response tokens
         async for token in chat_service.generate_response_stream(messages):
             full_response += token
             yield f"data: {json.dumps({'type': 'token', 'token': token})}\n\n"
 
-        # Create assistant node with full response using a NEW database session
         async with async_session_maker() as stream_db:
             try:
                 assistant_node = await chat_service.create_assistant_node(
@@ -127,8 +130,6 @@ async def send_message_stream(
                     content=full_response
                 )
                 await stream_db.commit()
-
-                # Send completion with assistant node
                 yield f"data: {json.dumps({'type': 'complete', 'node': NodeResponse.model_validate(assistant_node).model_dump(mode='json')})}\n\n"
             except Exception as e:
                 await stream_db.rollback()
@@ -137,30 +138,21 @@ async def send_message_stream(
     return StreamingResponse(
         stream_response(),
         media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-        }
+        headers={"Cache-Control": "no-cache", "Connection": "keep-alive"}
     )
 
 
 @router.post("/side-chat/stream")
 async def send_side_chat_stream(
     request: SideChatRequest,
-    db: AsyncSession = Depends(get_db)
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ):
     """Send a message in a side chat and get streaming AI response."""
-    # Verify parent node exists
-    result = await db.execute(select(Node).where(Node.id == request.parent_node_id))
-    parent_node = result.scalar_one_or_none()
-    if not parent_node:
-        raise HTTPException(status_code=404, detail="Parent node not found")
+    parent_node = await verify_node_ownership(request.parent_node_id, current_user, db)
 
-    # Get the main conversation path up to the parent node
     main_path = await chat_service.get_conversation_path(db, request.parent_node_id)
 
-    # Get existing side chat history for THIS SPECIFIC thread (filtered by selected_text)
-    # This ensures different selections on the same parent node have separate conversations
     side_chat_query = (
         select(Node)
         .where(
@@ -168,7 +160,6 @@ async def send_side_chat_stream(
             Node.node_type.in_([NodeType.SIDE_CHAT_USER, NodeType.SIDE_CHAT_ASSISTANT])
         )
     )
-    # Filter by selected_text to isolate this thread
     if request.selected_text is not None:
         side_chat_query = side_chat_query.where(Node.selected_text == request.selected_text)
     else:
@@ -178,61 +169,51 @@ async def send_side_chat_stream(
     result = await db.execute(side_chat_query)
     side_chat_history = list(result.scalars().all())
 
-    # Create user side chat node
     user_node = await chat_service.create_user_node(
         db=db,
         session_id=parent_node.session_id,
         parent_id=request.parent_node_id,
         content=request.content,
         node_type='side_chat_user',
-        selected_text=request.selected_text,  # Store the text that started this thread
+        selected_text=request.selected_text,
         selection_start=request.selection_start,
         selection_end=request.selection_end
     )
     await db.commit()
 
-    # Build side chat context
     messages = chat_service.build_side_chat_messages(
         main_path, side_chat_history, request.content, request.selected_text,
         request.include_main_context
     )
 
-    # Capture values for generator
     session_id = parent_node.session_id
-    user_node_id = user_node.id
     parent_node_id = request.parent_node_id
-    selected_text = request.selected_text  # Capture for assistant node
+    selected_text = request.selected_text
     selection_start = request.selection_start
     selection_end = request.selection_end
     user_node_response = NodeResponse.model_validate(user_node).model_dump(mode='json')
 
     async def stream_response():
         full_response = ""
-
-        # Send user node info first
         yield f"data: {json.dumps({'type': 'user_node', 'node': user_node_response})}\n\n"
 
-        # Stream AI response tokens
         async for token in chat_service.generate_response_stream(messages):
             full_response += token
             yield f"data: {json.dumps({'type': 'token', 'token': token})}\n\n"
 
-        # Create assistant node with full response using a NEW database session
         async with async_session_maker() as stream_db:
             try:
                 assistant_node = await chat_service.create_assistant_node(
                     db=stream_db,
                     session_id=session_id,
-                    parent_id=parent_node_id,  # Side chat assistant is also child of parent node
+                    parent_id=parent_node_id,
                     content=full_response,
                     node_type='side_chat_assistant',
-                    selected_text=selected_text,  # Store the same text as the user node
+                    selected_text=selected_text,
                     selection_start=selection_start,
                     selection_end=selection_end
                 )
                 await stream_db.commit()
-
-                # Send completion with assistant node
                 yield f"data: {json.dumps({'type': 'complete', 'node': NodeResponse.model_validate(assistant_node).model_dump(mode='json')})}\n\n"
             except Exception as e:
                 await stream_db.rollback()
@@ -241,48 +222,34 @@ async def send_side_chat_stream(
     return StreamingResponse(
         stream_response(),
         media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-        }
+        headers={"Cache-Control": "no-cache", "Connection": "keep-alive"}
     )
 
 
 @router.post("/regenerate/{node_id}", response_model=NodeResponse)
 async def regenerate_response(
     node_id: UUID,
-    db: AsyncSession = Depends(get_db)
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ) -> NodeResponse:
     """Regenerate an assistant response (creates sibling)."""
-    # Get the node to regenerate
-    result = await db.execute(select(Node).where(Node.id == node_id))
-    node = result.scalar_one_or_none()
-    if not node:
-        raise HTTPException(status_code=404, detail="Node not found")
+    node = await verify_node_ownership(node_id, current_user, db)
 
     if node.node_type != "assistant_message":
         raise HTTPException(status_code=400, detail="Can only regenerate assistant messages")
 
-    # Get the parent (user message)
     if not node.parent_id:
         raise HTTPException(status_code=400, detail="Cannot regenerate root node")
 
-    # Get conversation path up to the user message
     path = await chat_service.get_conversation_path(db, node.parent_id)
 
-    # Get the user message content
     result = await db.execute(select(Node).where(Node.id == node.parent_id))
     user_node = result.scalar_one()
 
     messages = chat_service.build_messages(path[:-1] if path else [], user_node.content)
-
-    # Generate new response
     response_content = await chat_service.generate_response(messages)
 
-    # Create new assistant node as sibling
-    result = await db.execute(
-        select(Node).where(Node.parent_id == node.parent_id)
-    )
+    result = await db.execute(select(Node).where(Node.parent_id == node.parent_id))
     siblings = result.scalars().all()
 
     new_node = Node(
@@ -299,9 +266,7 @@ async def regenerate_response(
         }
     )
 
-    # Mark old node as not selected
     node.is_selected_path = False
-
     db.add(new_node)
     await db.flush()
     await db.refresh(new_node)

@@ -65,21 +65,45 @@ class ChunkType(str, enum.Enum):
 # Models
 # ============================================
 
+class User(Base):
+    """User account for authentication."""
+    __tablename__ = "users"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    email = Column(String(255), unique=True, nullable=False, index=True)
+    name = Column(String(255), nullable=True)
+    picture = Column(String(500), nullable=True)  # Google profile picture URL
+    google_id = Column(String(255), unique=True, nullable=True, index=True)
+
+    # Optional: user's own OpenAI API key (encrypted in production)
+    openai_api_key = Column(String(255), nullable=True)
+
+    created_at = Column(DateTime(timezone=True), default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    last_login_at = Column(DateTime(timezone=True), nullable=True)
+
+    # Relationships
+    topics = relationship("Topic", back_populates="user", cascade="all, delete-orphan")
+
+
 class Topic(Base):
     """Top-level grouping for related sessions."""
     __tablename__ = "topics"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     name = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
     # Relationships
+    user = relationship("User", back_populates="topics")
     sessions = relationship("Session", back_populates="topic", cascade="all, delete-orphan")
     memory_chunks = relationship("MemoryChunk", back_populates="topic", cascade="all, delete-orphan")
 
     __table_args__ = (
+        Index('idx_topics_user_id', 'user_id'),
         Index('idx_topics_created_at', 'created_at'),
     )
 

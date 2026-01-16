@@ -66,11 +66,13 @@ async def health_check():
 
 
 # Import and include routers
+from api.routes.auth import router as auth_router
 from api.routes.topics import router as topics_router
 from api.routes.sessions import router as sessions_router, topics_sessions_router
 from api.routes.nodes import router as nodes_router, sessions_nodes_router
 from api.routes.chat import router as chat_router
 
+app.include_router(auth_router, prefix="/api/v1")
 app.include_router(topics_router, prefix="/api/v1")
 app.include_router(sessions_router, prefix="/api/v1")
 app.include_router(topics_sessions_router, prefix="/api/v1")

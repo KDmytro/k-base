@@ -25,12 +25,24 @@ class Settings(BaseSettings):
     debug: bool = True
     log_level: str = "INFO"
 
+    # Auth - Google OAuth
+    google_client_id: str = ""
+    google_client_secret: str = ""
+    jwt_secret_key: str = "dev-secret-change-in-production"  # Change in production!
+    jwt_algorithm: str = "HS256"
+    jwt_expire_hours: int = 24 * 7  # 1 week
+
     # Limits
     max_context_tokens: int = 8000
     max_memory_results: int = 10
 
-    # CORS
-    cors_origins: list[str] = ["http://localhost:5173", "http://localhost:3000"]
+    # CORS - can be overridden with CORS_ORIGINS env var (comma-separated)
+    cors_origins: list[str] = [
+        "http://localhost:5173",
+        "http://localhost:3000",
+        "https://k-base-app.web.app",
+        "https://k-base-app.firebaseapp.com",
+    ]
 
     @property
     def is_development(self) -> bool:

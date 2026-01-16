@@ -11,7 +11,10 @@ import type {
   ChatRequest,
   ChatResponse,
   SideChatThread,
+  User,
+  AuthResponse,
 } from '@/types/models';
+import { useAuthStore } from '@/stores/authStore';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
@@ -54,9 +57,18 @@ class ApiClient {
     this.baseUrl = baseUrl;
   }
 
+  private getAuthHeaders(): Record<string, string> {
+    const token = useAuthStore.getState().token;
+    if (token) {
+      return { Authorization: `Bearer ${token}` };
+    }
+    return {};
+  }
+
   private async request<T>(
     endpoint: string,
-    options: RequestInit = {}
+    options: RequestInit = {},
+    skipAuth = false
   ): Promise<T> {
     const url = `${this.baseUrl}${endpoint}`;
 
@@ -76,6 +88,7 @@ class ApiClient {
       body,
       headers: {
         'Content-Type': 'application/json',
+        ...(skipAuth ? {} : this.getAuthHeaders()),
         ...options.headers,
       },
     });
@@ -94,6 +107,22 @@ class ApiClient {
     const data = await response.json();
     // Transform response keys to camelCase
     return transformKeys<T>(data, snakeToCamel);
+  }
+
+  // Auth methods
+  async loginWithGoogle(idToken: string): Promise<AuthResponse> {
+    return this.request<AuthResponse>(
+      '/auth/google',
+      {
+        method: 'POST',
+        body: JSON.stringify({ idToken }),
+      },
+      true // Skip auth header for login
+    );
+  }
+
+  async getCurrentUser(): Promise<User> {
+    return this.request<User>('/auth/me');
   }
 
   // Topics
@@ -249,7 +278,10 @@ class ApiClient {
     try {
       const response = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...this.getAuthHeaders(),
+        },
         body,
       });
 
@@ -347,7 +379,10 @@ class ApiClient {
     try {
       const response = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...this.getAuthHeaders(),
+        },
         body,
       });
 
