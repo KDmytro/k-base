@@ -11,6 +11,12 @@ K-Base is a branching brainstorming and learning application that treats convers
 - Backend: FastAPI (Python 3.11+) with async SQLAlchemy 2.0
 - Database: PostgreSQL 15+ with pgvector extension
 - LLM: LiteLLM abstraction (currently gpt-4o-mini)
+- Auth: Google OAuth + JWT
+
+**Production URLs:**
+- Frontend: https://k-base-app.web.app (Firebase Hosting)
+- Backend: https://kbase-backend-589116738750.us-central1.run.app (Cloud Run)
+- Database: Cloud SQL PostgreSQL (k-base-app:us-central1:kbase-db)
 
 ## Development Commands
 
@@ -138,9 +144,67 @@ SQLAlchemy relationship names (like `children`) can conflict with Pydantic schem
 
 ## Current Implementation Status
 
-**Complete:** Basic chat, branching, tree visualization, streaming, markdown rendering, side chat threads, user notes, inline collapsed branches, cross-element highlighting, thread isolation
+**Complete:** Basic chat, branching, tree visualization, streaming, markdown rendering, side chat threads, user notes, inline collapsed branches, cross-element highlighting, thread isolation, Google OAuth authentication, per-user data isolation, production deployment
 
 **Next Phase (RAG):** Embedding service, memory chunk indexing, RAG search endpoint, context builder with RAG injection
+
+## Production Deployment
+
+### GCP Project Setup
+The project uses `kdmytro-personal` gcloud configuration. direnv auto-switches when entering this directory.
+
+```bash
+# Verify gcloud config
+gcloud config get project  # should show: k-base-app
+gcloud auth list           # should show: kdmytro@gmail.com
+```
+
+### Deploy Backend (Cloud Run)
+```bash
+cd backend
+
+# Build and push Docker image
+gcloud builds submit --tag us-central1-docker.pkg.dev/k-base-app/kbase-repo/kbase-backend --project=k-base-app
+
+# Deploy to Cloud Run (uses existing config)
+gcloud run deploy kbase-backend \
+  --image=us-central1-docker.pkg.dev/k-base-app/kbase-repo/kbase-backend \
+  --region=us-central1 \
+  --project=k-base-app
+
+# View logs
+gcloud run services logs read kbase-backend --region=us-central1 --project=k-base-app
+```
+
+### Deploy Frontend (Firebase Hosting)
+```bash
+cd frontend
+npm run build
+cd ..
+firebase deploy --only hosting
+```
+
+### Run Migrations on Cloud SQL
+```bash
+# Start Cloud SQL proxy
+cloud_sql_proxy -instances=k-base-app:us-central1:kbase-db=tcp:5433 &
+
+# Run migrations
+cd backend
+source .venv/bin/activate
+DATABASE_URL="postgresql+asyncpg://kbase_user:PASSWORD@127.0.0.1:5433/kbase" alembic upgrade head
+
+# Stop proxy
+pkill -f cloud_sql_proxy
+```
+
+### Secrets (stored in GCP Secret Manager)
+- `openai-api-key`
+- `google-client-id`
+- `google-client-secret`
+- `jwt-secret-key`
+- `anthropic-api-key`
+- `db-user-password`
 
 ## Working With This Codebase
 

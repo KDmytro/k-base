@@ -2,8 +2,17 @@
 
 K-Base is a brainstorming and learning application that treats conversations as trees rather than linear logs. Users can branch conversations at any point, collapse tangents with AI-generated summaries, and maintain shared memory across related sessions.
 
+## Live Demo
+
+**Production:** https://k-base-app.web.app
+
+- Frontend: Firebase Hosting
+- Backend: Google Cloud Run
+- Database: Cloud SQL PostgreSQL
+
 ## Features
 
+- **Google OAuth Authentication**: Sign in with Google, per-user data isolation
 - **Branching Conversations**: Fork conversations at any point without losing the main thread
 - **Inline Branch Switching**: Non-active branches appear as collapsed preview cards at fork points
 - **Side Chat Threads**: Select any text in a message to start a focused side conversation
@@ -241,6 +250,13 @@ The project follows a phased implementation approach:
 - [x] Thread isolation (separate LLM context per selection)
 - [x] Inline collapsed branches (replaced dropdown with preview cards)
 
+### Phase 3.5: Authentication & Deployment ✅ (COMPLETE)
+- [x] Google OAuth integration (Sign in with Google)
+- [x] JWT-based session management
+- [x] User model with per-user data isolation
+- [x] Production deployment (Firebase Hosting + Cloud Run + Cloud SQL)
+- [x] CORS configuration for production domains
+
 ### Phase 4: RAG Integration
 - [ ] Embedding service integration
 - [ ] Memory chunk indexing
@@ -273,4 +289,4 @@ This project is in active development.
 
 ---
 
-*Last Updated: 2026-01-04*
+*Last Updated: 2026-01-15*
