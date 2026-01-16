@@ -15,6 +15,7 @@ import type {
   AuthResponse,
   UserPreferences,
   UserPreferencesUpdate,
+  ModelsResponse,
 } from '@/types/models';
 import { useAuthStore } from '@/stores/authStore';
 
@@ -137,6 +138,11 @@ class ApiClient {
       method: 'PUT',
       body: JSON.stringify(data),
     });
+  }
+
+  // Models
+  async getModels(): Promise<ModelsResponse> {
+    return this.request<ModelsResponse>('/chat/models');
   }
 
   // Topics
@@ -284,10 +290,11 @@ class ApiClient {
       onToken: (token: string) => void;
       onComplete: (node: Node) => void;
       onError: (error: Error) => void;
-    }
+    },
+    model?: string
   ): Promise<void> {
     const url = `${this.baseUrl}/chat/side-chat/stream`;
-    const body = JSON.stringify(transformKeys({ parentNodeId, content, selectedText, selectionStart, selectionEnd, includeMainContext }, camelToSnake));
+    const body = JSON.stringify(transformKeys({ parentNodeId, content, selectedText, selectionStart, selectionEnd, includeMainContext, model }, camelToSnake));
 
     try {
       const response = await fetch(url, {

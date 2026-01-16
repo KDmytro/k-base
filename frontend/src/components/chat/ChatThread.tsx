@@ -10,7 +10,7 @@ import type { Node } from '@/types/models';
 interface ChatThreadProps {
   nodes: Node[];
   isLoading: boolean;
-  onSendMessage: (message: string) => void;
+  onSendMessage: (message: string, model?: string) => void;
   onForkNode?: (nodeId: string) => void;
   replyToNode?: Node | null;
   onClearReply?: () => void;

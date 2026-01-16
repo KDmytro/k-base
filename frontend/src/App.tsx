@@ -373,7 +373,7 @@ function App() {
     );
   }, [sideChatPanelNodeId, sideChatSelectedText, sideChatSelectionStart, sideChatSelectionEnd]);
 
-  const handleSendMessage = useCallback(async (message: string) => {
+  const handleSendMessage = useCallback(async (message: string, model?: string) => {
     if (!currentSessionId) return;
 
     const isFork = !!replyToNode;
@@ -395,6 +395,7 @@ function App() {
         sessionId: currentSessionId,
         parentNodeId,
         content: message,
+        model,
       },
       {
         onUserNode: (userNode) => {

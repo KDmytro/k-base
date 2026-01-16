@@ -10,7 +10,7 @@ import json
 
 from api.auth import get_current_user
 from models.database import Session, Node, Topic, User, UserPreferences, NodeType, get_db, async_session_maker
-from models.schemas import ChatRequest, ChatResponse, NodeResponse, SideChatRequest
+from models.schemas import ChatRequest, ChatResponse, NodeResponse, SideChatRequest, AVAILABLE_MODELS
 from services.chat_service import chat_service
 
 router = APIRouter(prefix="/chat", tags=["chat"])
@@ -181,8 +181,19 @@ async def send_side_chat_stream(
     """Send a message in a side chat and get streaming AI response."""
     parent_node = await verify_node_ownership(request.parent_node_id, current_user, db)
 
+    # Fetch session for model resolution
+    result = await db.execute(select(Session).where(Session.id == parent_node.session_id))
+    session = result.scalar_one()
+
     # Fetch user preferences for system prompt injection
     preferences = await get_user_preferences(current_user.id, db)
+
+    # Resolve which model to use
+    model = chat_service.resolve_model(
+        request.model,
+        session.default_model,
+        preferences.preferred_model if preferences else None
+    )
 
     main_path = await chat_service.get_conversation_path(db, request.parent_node_id)
 
@@ -230,7 +241,7 @@ async def send_side_chat_stream(
         full_response = ""
         yield f"data: {json.dumps({'type': 'user_node', 'node': user_node_response})}\n\n"
 
-        async for token in chat_service.generate_response_stream(messages):
+        async for token in chat_service.generate_response_stream(messages, model=model):
             full_response += token
             yield f"data: {json.dumps({'type': 'token', 'token': token})}\n\n"
 
@@ -244,7 +255,8 @@ async def send_side_chat_stream(
                     node_type='side_chat_assistant',
                     selected_text=selected_text,
                     selection_start=selection_start,
-                    selection_end=selection_end
+                    selection_end=selection_end,
+                    model=model
                 )
                 await stream_db.commit()
                 yield f"data: {json.dumps({'type': 'complete', 'node': NodeResponse.model_validate(assistant_node).model_dump(mode='json')})}\n\n"
@@ -274,8 +286,20 @@ async def regenerate_response(
     if not node.parent_id:
         raise HTTPException(status_code=400, detail="Cannot regenerate root node")
 
+    # Fetch session for model resolution
+    result = await db.execute(select(Session).where(Session.id == node.session_id))
+    session = result.scalar_one()
+
     # Fetch user preferences for system prompt injection
     preferences = await get_user_preferences(current_user.id, db)
+
+    # Resolve which model to use (use original node's model if available)
+    original_model = node.generation_config.get("model") if node.generation_config else None
+    model = chat_service.resolve_model(
+        original_model,
+        session.default_model,
+        preferences.preferred_model if preferences else None
+    )
 
     path = await chat_service.get_conversation_path(db, node.parent_id)
 
@@ -283,7 +307,7 @@ async def regenerate_response(
     user_node = result.scalar_one()
 
     messages = chat_service.build_messages(path[:-1] if path else [], user_node.content, preferences)
-    response_content = await chat_service.generate_response(messages)
+    response_content = await chat_service.generate_response(messages, model=model)
 
     result = await db.execute(select(Node).where(Node.parent_id == node.parent_id))
     siblings = result.scalars().all()
@@ -296,8 +320,8 @@ async def regenerate_response(
         sibling_index=len(siblings),
         is_selected_path=True,
         generation_config={
-            "provider": "openai",
-            "model": chat_service.default_model,
+            "provider": chat_service.get_provider(model),
+            "model": model,
             "temperature": chat_service.default_temperature
         }
     )
@@ -308,3 +332,9 @@ async def regenerate_response(
     await db.refresh(new_node)
 
     return NodeResponse.model_validate(new_node)
+
+
+@router.get("/models")
+async def list_models():
+    """Return available LLM models."""
+    return {"models": AVAILABLE_MODELS}

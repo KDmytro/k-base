@@ -11,14 +11,15 @@ export function SettingsPanel() {
   const [customInstructions, setCustomInstructions] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [hasLoaded, setHasLoaded] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
 
-  // Load preferences when panel opens
+  // Load preferences when panel opens (only once)
   useEffect(() => {
-    if (isOpen && !preferences && !isLoading) {
+    if (isOpen && !hasLoaded && !isLoading) {
       loadPreferences();
     }
-  }, [isOpen, preferences, isLoading]);
+  }, [isOpen, hasLoaded, isLoading]);
 
   // Populate form when preferences load
   useEffect(() => {
@@ -28,6 +29,13 @@ export function SettingsPanel() {
       setCustomInstructions(preferences.customInstructions || '');
     }
   }, [preferences]);
+
+  // Reset hasLoaded when panel closes (to allow refresh on next open)
+  useEffect(() => {
+    if (!isOpen) {
+      setHasLoaded(false);
+    }
+  }, [isOpen]);
 
   // Close on escape
   useEffect(() => {
@@ -47,9 +55,11 @@ export function SettingsPanel() {
     try {
       const prefs = await apiClient.getPreferences();
       setPreferences(prefs);
+      setHasLoaded(true);
     } catch (err) {
       setError('Failed to load preferences');
       console.error('Error loading preferences:', err);
+      setHasLoaded(true); // Mark as loaded even on error to prevent infinite retry
     } finally {
       setLoading(false);
     }

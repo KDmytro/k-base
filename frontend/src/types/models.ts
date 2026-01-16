@@ -34,6 +34,7 @@ export interface Session {
     name: string;
     description?: string;
     rootNodeId?: string;
+    defaultModel?: string;
     createdAt: Date;
     updatedAt: Date;
 }
@@ -116,6 +117,7 @@ export interface SessionCreate {
     topicId: string;
     name: string;
     description?: string;
+    defaultModel?: string;
 }
 
 export interface ChatRequest {
@@ -124,6 +126,7 @@ export interface ChatRequest {
     content: string;
     createBranch?: boolean;
     includeRag?: boolean;
+    model?: string;  // Per-message model override
 }
 
 export interface ChatResponse {
@@ -187,6 +190,7 @@ export interface UserPreferences {
     background: string | null;
     interests: string | null;
     customInstructions: string | null;
+    preferredModel: string | null;
     createdAt: Date;
     updatedAt: Date;
 }
@@ -195,4 +199,15 @@ export interface UserPreferencesUpdate {
     background?: string | null;
     interests?: string | null;
     customInstructions?: string | null;
+    preferredModel?: string | null;
+}
+
+// Model types for multi-provider LLM support
+export interface ModelInfo {
+    provider: string;
+    display: string;
+}
+
+export interface ModelsResponse {
+    models: Record<string, ModelInfo>;
 }
