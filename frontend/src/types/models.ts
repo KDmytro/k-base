@@ -210,4 +210,5 @@ export interface ModelInfo {
 
 export interface ModelsResponse {
     models: Record<string, ModelInfo>;
+    default: string;
 }

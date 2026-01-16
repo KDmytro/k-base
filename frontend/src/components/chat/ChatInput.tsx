@@ -14,6 +14,7 @@ interface ChatInputProps {
 export function ChatInput({ onSend, disabled, placeholder, replyToNode, onClearReply }: ChatInputProps) {
   const [message, setMessage] = useState('');
   const [models, setModels] = useState<Record<string, ModelInfo>>({});
+  const [defaultModel, setDefaultModel] = useState<string>('');
   const [selectedModel, setSelectedModel] = useState<string>('');
   const [showModelDropdown, setShowModelDropdown] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -23,6 +24,7 @@ export function ChatInput({ onSend, disabled, placeholder, replyToNode, onClearR
   useEffect(() => {
     apiClient.getModels().then(response => {
       setModels(response.models);
+      setDefaultModel(response.default);
     }).catch(err => {
       console.error('Failed to fetch models:', err);
     });
@@ -113,24 +115,30 @@ export function ChatInput({ onSend, disabled, placeholder, replyToNode, onClearR
               title="Select model"
             >
               <span className="truncate">
-                {selectedModel ? getModelDisplayName(selectedModel) : 'Default'}
+                {selectedModel
+                  ? getModelDisplayName(selectedModel)
+                  : defaultModel
+                    ? `${getModelDisplayName(defaultModel)} (default)`
+                    : 'Loading...'}
               </span>
               <ChevronDown size={16} />
             </button>
 
             {showModelDropdown && (
               <div className="absolute bottom-full mb-1 right-0 bg-white border border-gray-200 rounded-lg shadow-lg z-50 min-w-[200px] max-h-64 overflow-y-auto">
-                <button
-                  onClick={() => {
-                    setSelectedModel('');
-                    setShowModelDropdown(false);
-                  }}
-                  className={`w-full px-3 py-2 text-left text-sm hover:bg-gray-100 ${
-                    !selectedModel ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
-                  }`}
-                >
-                  Default (auto)
-                </button>
+                {defaultModel && (
+                  <button
+                    onClick={() => {
+                      setSelectedModel('');
+                      setShowModelDropdown(false);
+                    }}
+                    className={`w-full px-3 py-2 text-left text-sm hover:bg-gray-100 ${
+                      !selectedModel ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
+                    }`}
+                  >
+                    {getModelDisplayName(defaultModel)} (default)
+                  </button>
+                )}
                 {Object.entries(models).map(([modelId, info]) => (
                   <button
                     key={modelId}

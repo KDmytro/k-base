@@ -337,4 +337,5 @@ async def regenerate_response(
 @router.get("/models")
 async def list_models():
     """Return available LLM models."""
-    return {"models": AVAILABLE_MODELS}
+    from config import settings
+    return {"models": AVAILABLE_MODELS, "default": settings.default_model}

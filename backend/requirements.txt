@@ -10,9 +10,10 @@ alembic==1.13.1
 pgvector==0.2.4
 
 # LLM & Embeddings
-litellm==1.17.9
-openai==1.10.0
-tiktoken==0.5.2
+litellm>=1.55.0
+openai>=1.50.0
+tiktoken>=0.7.0
+anthropic>=0.40.0
 
 # Utilities
 pydantic==2.5.3

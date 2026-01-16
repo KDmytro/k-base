@@ -16,9 +16,9 @@ from models.database import NodeType, NodeStatus, ChunkType
 AVAILABLE_MODELS = {
     "gpt-4o": {"provider": "openai", "display": "GPT-4o"},
     "gpt-4o-mini": {"provider": "openai", "display": "GPT-4o Mini"},
-    "claude-opus-4-5-20251101": {"provider": "anthropic", "display": "Claude Opus 4.5"},
-    "claude-sonnet-4-20250514": {"provider": "anthropic", "display": "Claude Sonnet 4"},
-    "claude-3-5-haiku-20241022": {"provider": "anthropic", "display": "Claude Haiku 3.5"},
+    "anthropic/claude-opus-4-5-20251101": {"provider": "anthropic", "display": "Claude Opus 4.5"},
+    "anthropic/claude-sonnet-4-20250514": {"provider": "anthropic", "display": "Claude Sonnet 4"},
+    "anthropic/claude-3-5-haiku-20241022": {"provider": "anthropic", "display": "Claude Haiku 3.5"},
     "gemini/gemini-2.0-flash": {"provider": "google", "display": "Gemini 2.0 Flash"},
     "gemini/gemini-2.0-pro-exp-02-05": {"provider": "google", "display": "Gemini 2.0 Pro"},
 }

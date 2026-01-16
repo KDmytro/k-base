@@ -142,6 +142,9 @@ Side chats intentionally exclude full conversation context - only selected text 
 ### Pydantic/SQLAlchemy Field Conflicts
 SQLAlchemy relationship names (like `children`) can conflict with Pydantic schema fields. Either rename or exclude from ORM mapping.
 
+### Always Run Migrations After Deploy
+When deploying backend changes that include new database columns, remember to run migrations on Cloud SQL. The backend will fail with `column X does not exist` errors otherwise. See "Run Migrations on Cloud SQL" section for commands.
+
 ## Current Implementation Status
 
 **Complete:** Basic chat, branching, tree visualization, streaming, markdown rendering, side chat threads, user notes, inline collapsed branches, cross-element highlighting, thread isolation, Google OAuth authentication, per-user data isolation, production deployment
